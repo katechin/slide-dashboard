@@ -522,10 +522,6 @@
                 <div class="stat-label">Avg Hourly Rate</div>
                 <div class="stat-value" id="sumRate">$&#8212;</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Appt Discrepancy</div>
-                <div class="stat-value" id="sumDisc" style="color:var(--muted)">&#8212;</div>
-            </div>
         </div>
     </div>
 
@@ -560,29 +556,6 @@
         </div>
     </div>
 
-    <!-- Appointment Discrepancy -->
-    <div class="card">
-        <div class="card-header">&#128336; Appointment Duration Discrepancy</div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width:160px;">Month / Period</th>
-                        <th>Actual Avg Duration (min)</th>
-                        <th>Booked Avg Duration (min)</th>
-                        <th>Difference</th>
-                        <th>Notes</th>
-                        <th class="no-print" style="width:38px;"></th>
-                    </tr>
-                </thead>
-                <tbody id="apptBody"></tbody>
-            </table>
-        </div>
-        <div class="table-foot-bar no-print">
-            <button class="btn-add-row" onclick="addApptRow()">+ Add row</button>
-        </div>
-    </div>
-
     <!-- Medicare Item Billing -->
     <div class="card">
         <div class="card-header">&#128203; Medicare Item Billing Discrepancy</div>
@@ -603,10 +576,6 @@
 // ── Constants ──────────────────────────────────────────────────────────────────
 const MEDICARE_RATES = { '3': 74, '23': 115, '36': 209, '44': 311 };
 
-const MONTHS = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December'
-];
 const STORE = 'cubiko_doctors';
 
 // ── State ──────────────────────────────────────────────────────────────────────
@@ -621,8 +590,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ── Default data ───────────────────────────────────────────────────────────────
 const defaultBillingRows = () => [{}, {}, {}];
-const defaultApptRows    = () => MONTHS.map(m => ({ period: m, actual: '', booked: '', notes: '' }));
-
 // ── Billing table ──────────────────────────────────────────────────────────────
 function renderBillingTable(rows) {
     const tbody = document.getElementById('billingBody');
@@ -669,52 +636,6 @@ function makeBillingRow(data = {}) {
 
 function addBillingRow(data) {
     document.getElementById('billingBody').appendChild(makeBillingRow(data));
-    recalcSummary();
-}
-
-// ── Appointment table ──────────────────────────────────────────────────────────
-function renderApptTable(rows) {
-    const tbody = document.getElementById('apptBody');
-    tbody.innerHTML = '';
-    rows.forEach(r => tbody.appendChild(makeApptRow(r)));
-    recalcSummary();
-}
-
-function makeApptRow(data = {}) {
-    const tr   = document.createElement('tr');
-    const act  = data.actual ?? '';
-    const bkd  = data.booked ?? '';
-    const diff = diffVal(act, bkd);
-
-    if (diff !== null && diff !== 0) tr.classList.add('has-discrepancy');
-
-    tr.innerHTML = `
-        <td><input class="cell-input" value="${x(data.period ?? '')}" placeholder="e.g. January" /></td>
-        <td><input class="cell-input" type="text" inputmode="decimal" value="${x(act)}" placeholder="0" /></td>
-        <td><input class="cell-input" type="text" inputmode="decimal" value="${x(bkd)}" placeholder="0" /></td>
-        <td class="diff-cell">${renderDiff(diff)}</td>
-        <td><input class="cell-input" value="${x(data.notes ?? '')}" placeholder="Optional notes&#8230;" /></td>
-        <td class="no-print" style="text-align:center;">
-            <button class="btn-del-row" onclick="removeRow(this)" title="Remove row">&#10005;</button>
-        </td>`;
-
-    const inputs = tr.querySelectorAll('.cell-input');
-    const actualIn = inputs[1], bookedIn = inputs[2];
-
-    const refresh = () => {
-        const d = diffVal(actualIn.value, bookedIn.value);
-        tr.classList.toggle('has-discrepancy', d !== null && d !== 0);
-        tr.querySelector('.diff-cell').innerHTML = renderDiff(d);
-        recalcSummary();
-    };
-
-    actualIn.addEventListener('input', refresh);
-    bookedIn.addEventListener('input', refresh);
-    return tr;
-}
-
-function addApptRow(data) {
-    document.getElementById('apptBody').appendChild(makeApptRow(data));
     recalcSummary();
 }
 
@@ -890,19 +811,26 @@ function removeRow(btn) {
 }
 
 // Parse hh:mm:ss or hh:mm → decimal hours. Returns NaN for non-empty invalid input.
+// Parse hh:mm:ss or hh:mm → decimal hours.
+// e.g. "75:00:00" → 75, "77:40:00" → 77.6667, "8:45" → 8.75
 function parseHMS(val) {
-    const s = (val || '').trim();
+    const s = String(val || '').trim();
     if (!s) return 0;
-    const m = s.match(/^(\d+):([0-5]\d)(?::([0-5]\d))?$/);
-    if (!m) return NaN;
-    return parseInt(m[1], 10) + parseInt(m[2], 10) / 60 + (m[3] ? parseInt(m[3], 10) / 3600 : 0);
+    const parts = s.split(':');
+    if (parts.length < 2 || parts.length > 3) return NaN;
+    const h   = parseInt(parts[0], 10);
+    const min = parseInt(parts[1], 10);
+    const sec = parts.length === 3 ? parseInt(parts[2], 10) : 0;
+    if ([h, min, sec].some(isNaN)) return NaN;
+    if (min < 0 || min > 59 || sec < 0 || sec > 59) return NaN;
+    return h + min / 60 + sec / 3600;
 }
 
-// Decimal hours → "hh:mm" string for display
+// Decimal hours → "h:mm" string for display
 function decimalToHM(h) {
-    const totalMin = Math.round(h * 60);
-    const hh = Math.floor(totalMin / 60);
-    const mm = totalMin % 60;
+    const totalSec = Math.round(h * 3600);
+    const hh = Math.floor(totalSec / 3600);
+    const mm = Math.floor((totalSec % 3600) / 60);
     return hh + ':' + String(mm).padStart(2, '0');
 }
 
@@ -915,23 +843,11 @@ function validateHMS(input) {
 }
 
 function autoRate(bill, hours) {
-    const b = parseFloat(bill), h = parseHMS(hours);
+    const b = parseFloat(String(bill).replace(/[$,]/g, ''));
+    const h = parseHMS(hours);
     return (b > 0 && h > 0 && !isNaN(h)) ? '$' + (b / h).toFixed(2) + '/hr' : '';
 }
 
-function diffVal(actual, booked) {
-    const a = parseFloat(actual), b = parseFloat(booked);
-    if (isNaN(a) || isNaN(b)) return null;
-    return parseFloat((a - b).toFixed(2));
-}
-
-function renderDiff(d) {
-    if (d === null)  return '<span class="diff-empty">&#8212;</span>';
-    if (d === 0)     return '<span class="diff-zero">&#10003; 0 min</span>';
-    const sign = d > 0 ? '+' : '';
-    const cls  = d > 0 ? 'diff-pos' : 'diff-neg';
-    return `<span class="${cls}">${sign}${d} min</span>`;
-}
 
 function x(s) {
     // Escape for HTML attribute values
@@ -963,25 +879,6 @@ function recalcSummary() {
     document.getElementById('sumHours').textContent    = hrsDisplay ? hrsDisplay : '\u2014';
     document.getElementById('sumRate').textContent     = avgRate    ? '$' + avgRate.toFixed(0) + '/hr' : '$\u2014';
 
-    // Discrepancy
-    let totalDisc = 0, hasDiscData = false;
-    document.querySelectorAll('#apptBody tr').forEach(tr => {
-        const ins = tr.querySelectorAll('.cell-input');
-        const d   = diffVal(ins[1]?.value, ins[2]?.value);
-        if (d !== null) { totalDisc += Math.abs(d); hasDiscData = true; }
-    });
-
-    const discEl = document.getElementById('sumDisc');
-    if (!hasDiscData) {
-        discEl.textContent  = '\u2014';
-        discEl.style.color  = 'var(--muted)';
-    } else if (totalDisc === 0) {
-        discEl.textContent  = '0 min \u2713';
-        discEl.style.color  = 'var(--green)';
-    } else {
-        discEl.textContent  = totalDisc.toFixed(0) + ' min';
-        discEl.style.color  = 'var(--red)';
-    }
 }
 
 function fmtCurr(n) {
@@ -1003,13 +900,6 @@ function extractData() {
         });
     });
 
-    const appts = [];
-    document.querySelectorAll('#apptBody tr').forEach(tr => {
-        const ins = tr.querySelectorAll('.cell-input');
-        // ins: [0]=period, [1]=actual, [2]=booked, [3]=notes  (diff cell has no input)
-        appts.push({ period: ins[0]?.value || '', actual: ins[1]?.value || '', booked: ins[2]?.value || '', notes: ins[3]?.value || '' });
-    });
-
     const medicare = {};
     Object.keys(MEDICARE_RATES).forEach(item => {
         medicare[item] = [];
@@ -1029,7 +919,7 @@ function extractData() {
         doctorName: document.getElementById('doctorName').value,
         dateFrom:   document.getElementById('dateFrom').value,
         dateTo:     document.getElementById('dateTo').value,
-        billing, appts, medicare,
+        billing, medicare,
         savedAt: new Date().toISOString()
     };
 }
@@ -1040,7 +930,6 @@ function applyData(d) {
     document.getElementById('dateFrom').value   = d.dateFrom   || '';
     document.getElementById('dateTo').value     = d.dateTo     || '';
     renderBillingTable(d.billing?.length ? d.billing : defaultBillingRows());
-    renderApptTable(d.appts?.length      ? d.appts   : defaultApptRows());
     // Accept new object format; fall back to defaults if old array format or missing
     const medData = (d.medicare && !Array.isArray(d.medicare)) ? d.medicare : defaultMedRows();
     renderMedTable(medData);
@@ -1051,7 +940,6 @@ function loadBlankReport() {
     document.getElementById('dateFrom').value   = '';
     document.getElementById('dateTo').value     = '';
     renderBillingTable(defaultBillingRows());
-    renderApptTable(defaultApptRows());
     renderMedTable(defaultMedRows());
 }
 
