@@ -345,6 +345,42 @@
 
         .btn-del-row:hover { background: #fecaca; }
 
+        /* ── Date range cell ── */
+        .date-range-cell {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: nowrap;
+        }
+
+        .date-pick {
+            width: 136px;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            padding: 5px 7px;
+            font-size: 12px;
+            font-family: inherit;
+            color: var(--text);
+            background: transparent;
+            outline: none;
+            transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+            cursor: pointer;
+        }
+
+        .date-pick:hover  { background: #f0f4f8; border-color: var(--border); }
+        .date-pick:focus  { background: white; border-color: var(--blue); box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+
+        .date-sep {
+            font-size: 11px;
+            color: var(--muted);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        @media print {
+            .date-pick { font-size: 11px; padding: 2px 4px; border: none; background: transparent; width: auto; }
+        }
+
         /* ── Invalid time input ── */
         .cell-input.invalid {
             border-color: var(--red) !important;
@@ -492,7 +528,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width:160px;">Month</th>
+                        <th style="min-width:290px;">Date Range</th>
                         <th>Total Billings ($)</th>
                         <th>Hours Worked</th>
                         <th>Hourly Rate (auto)</th>
@@ -512,7 +548,7 @@
             </table>
         </div>
         <div class="table-foot-bar no-print">
-            <button class="btn-add-row" onclick="addBillingRow()">+ Add month</button>
+            <button class="btn-add-row" onclick="addBillingRow()">+ Add row</button>
         </div>
     </div>
 
@@ -576,7 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Default data ───────────────────────────────────────────────────────────────
-const defaultBillingRows = () => MONTHS.map(m => ({ month: m, billings: '', hours: '' }));
+const defaultBillingRows = () => [{}, {}, {}];
 const defaultApptRows    = () => MONTHS.map(m => ({ period: m, actual: '', booked: '', notes: '' }));
 
 // ── Billing table ──────────────────────────────────────────────────────────────
@@ -588,13 +624,21 @@ function renderBillingTable(rows) {
 }
 
 function makeBillingRow(data = {}) {
-    const tr = document.createElement('tr');
+    const tr    = document.createElement('tr');
     const bill  = data.billings ?? '';
     const hours = data.hours    ?? '';
     const rate  = autoRate(bill, hours);
+    const dfrom = data.dateFrom ?? '';
+    const dto   = data.dateTo   ?? '';
 
     tr.innerHTML = `
-        <td><input class="cell-input" value="${x(data.month ?? '')}" placeholder="e.g. January" /></td>
+        <td>
+            <div class="date-range-cell">
+                <input class="date-pick" type="date" value="${x(dfrom)}" />
+                <span class="date-sep">to</span>
+                <input class="date-pick" type="date" value="${x(dto)}" />
+            </div>
+        </td>
         <td><input class="cell-input" type="text" inputmode="decimal" value="${x(bill)}"  placeholder="0.00" /></td>
         <td><input class="cell-input hms-input"  type="text"         value="${x(hours)}" placeholder="hh:mm:ss" /></td>
         <td><input class="cell-input auto-calc"   type="text"         value="${x(rate)}"  placeholder="auto" readonly tabindex="-1" /></td>
@@ -602,7 +646,8 @@ function makeBillingRow(data = {}) {
             <button class="btn-del-row" onclick="removeRow(this)" title="Remove row">&#10005;</button>
         </td>`;
 
-    const [, billIn, hoursIn, rateIn] = tr.querySelectorAll('.cell-input');
+    // date pickers are NOT .cell-input — so indices: [0]=billings, [1]=hours, [2]=rate
+    const [billIn, hoursIn, rateIn] = tr.querySelectorAll('.cell-input');
     const refresh = () => {
         validateHMS(hoursIn);
         rateIn.value = autoRate(billIn.value, hoursIn.value);
@@ -891,8 +936,9 @@ function recalcSummary() {
 
     document.querySelectorAll('#billingBody tr').forEach(tr => {
         const ins = tr.querySelectorAll('.cell-input');
-        totalBill += parseFloat(ins[1]?.value) || 0;
-        const h = parseHMS(ins[2]?.value);
+        // ins[0]=billings, ins[1]=hours, ins[2]=rate (date pickers use .date-pick, not .cell-input)
+        totalBill += parseFloat(ins[0]?.value) || 0;
+        const h = parseHMS(ins[1]?.value);
         totalHrs  += (!isNaN(h) ? h : 0);
     });
 
@@ -938,8 +984,15 @@ function fmtCurr(n) {
 function extractData() {
     const billing = [];
     document.querySelectorAll('#billingBody tr').forEach(tr => {
-        const ins = tr.querySelectorAll('.cell-input');
-        billing.push({ month: ins[0]?.value || '', billings: ins[1]?.value || '', hours: ins[2]?.value || '' });
+        const picks = tr.querySelectorAll('.date-pick');
+        const ins   = tr.querySelectorAll('.cell-input');
+        // picks[0]=dateFrom, picks[1]=dateTo; ins[0]=billings, ins[1]=hours
+        billing.push({
+            dateFrom: picks[0]?.value || '',
+            dateTo:   picks[1]?.value || '',
+            billings: ins[0]?.value   || '',
+            hours:    ins[1]?.value   || ''
+        });
     });
 
     const appts = [];
