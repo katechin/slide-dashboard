@@ -98,7 +98,15 @@
             opacity: 0.9;
         }
 
-        .date-row .h-input { font-size: 12px; width: 134px; padding: 4px 10px; }
+        .date-row .h-input { font-size: 12px; width: 152px; padding: 4px 10px; }
+
+        /* date picker on dark header */
+        .h-input[type="date"] { color-scheme: dark; }
+        .h-input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) opacity(0.7);
+            cursor: pointer;
+        }
+        .h-input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
         /* ── Controls Bar ── */
         .controls-bar {
@@ -475,9 +483,9 @@
         <input id="doctorName" class="h-input" type="text" placeholder="Dr. First Last" autocomplete="off" />
         <div class="date-row">
             <span>Report period:</span>
-            <input id="dateFrom" class="h-input" type="text" placeholder="01 Jan 2025" />
+            <input id="dateFrom" class="h-input" type="date" />
             <span>to</span>
-            <input id="dateTo"   class="h-input" type="text" placeholder="31 Dec 2025" />
+            <input id="dateTo"   class="h-input" type="date" />
         </div>
     </div>
 </header>
