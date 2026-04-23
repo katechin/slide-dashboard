@@ -563,6 +563,19 @@
       box-shadow: 0 6px 20px rgba(60, 50, 40, 0.09), 0 2px 6px rgba(60, 50, 40, 0.05);
     }
 
+    .person-card[draggable="true"] { cursor: grab; }
+    .person-card[draggable="true"]:active { cursor: grabbing; }
+
+    .person-card.card-dragging {
+      opacity: 0.38;
+      transform: scale(0.98);
+    }
+
+    .person-card.card-drag-over {
+      border-color: var(--accent);
+      box-shadow: -3px 0 0 var(--accent), 0 6px 20px rgba(60, 50, 40, 0.09);
+    }
+
     .card-top {
       display: flex;
       align-items: flex-start;
@@ -1004,8 +1017,9 @@
     };
 
     // ─── State ─────────────────────────────────────────────
-    let staff  = [];
-    let editId = null;
+    let staff     = [];
+    let editId    = null;
+    let dragSrcId = null;
 
     // ─── Row mapping ───────────────────────────────────────
     function toRow(p) {
@@ -1023,6 +1037,7 @@
         last_day:        p.lastDay    || null,
         notes:           p.notes      || '',
         is_remote:       !!p.remote,
+        sort_order:      p.sortOrder ?? 0,
         saved_at:        new Date().toISOString()
       };
     }
@@ -1040,7 +1055,8 @@
         firstDay:       row.first_day   || '',
         lastDay:        row.last_day    || '',
         notes:          row.notes       || '',
-        remote:         !!row.is_remote
+        remote:         !!row.is_remote,
+        sortOrder:      row.sort_order  ?? 0
       };
     }
 
@@ -1273,7 +1289,8 @@
           staff[i] = person;
         }
       } else {
-        person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '' };
+        const sortOrder = staff.filter(p => p.stage === stage).length;
+        person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder };
         staff.push(person);
       }
 
@@ -1351,6 +1368,71 @@
           saved_at: new Date().toISOString()
         }).eq('id', id);
       });
+    }
+
+    // ─── Drag-and-drop reordering ──────────────────────────
+    function onDragStart(e, id) {
+      dragSrcId = id;
+      e.dataTransfer.effectAllowed = 'move';
+      // Delay class so it doesn't affect the drag ghost image
+      setTimeout(() => {
+        const el = document.getElementById('card-' + id);
+        if (el) el.classList.add('card-dragging');
+      }, 0);
+    }
+
+    function onDragEnd(e) {
+      document.querySelectorAll('.card-dragging, .card-drag-over')
+        .forEach(el => el.classList.remove('card-dragging', 'card-drag-over'));
+      dragSrcId = null;
+    }
+
+    function onDragOver(e, id) {
+      if (id === dragSrcId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.card-drag-over')
+        .forEach(el => el.classList.remove('card-drag-over'));
+      const el = document.getElementById('card-' + id);
+      if (el) el.classList.add('card-drag-over');
+    }
+
+    function onDragLeave(e) {
+      if (!e.currentTarget.contains(e.relatedTarget)) {
+        e.currentTarget.classList.remove('card-drag-over');
+      }
+    }
+
+    async function onDrop(e, targetId) {
+      e.preventDefault();
+      document.querySelectorAll('.card-drag-over')
+        .forEach(el => el.classList.remove('card-drag-over'));
+      if (!dragSrcId || dragSrcId === targetId) return;
+
+      const src = staff.find(p => p.id === dragSrcId);
+      const tgt = staff.find(p => p.id === targetId);
+      if (!src || !tgt || src.stage !== tgt.stage) return;
+
+      // Reorder within stage
+      const items = staff
+        .filter(p => p.stage === src.stage)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+      const srcIdx = items.findIndex(p => p.id === dragSrcId);
+      const tgtIdx = items.findIndex(p => p.id === targetId);
+      items.splice(srcIdx, 1);
+      items.splice(tgtIdx, 0, src);
+      items.forEach((p, i) => { p.sortOrder = i; });
+
+      render();
+
+      // Persist new order to Supabase
+      await Promise.all(items.map(p =>
+        db.from('slide_staff').update({
+          sort_order: p.sortOrder,
+          saved_at:   new Date().toISOString()
+        }).eq('id', p.id)
+      ));
     }
 
     // ─── Helpers ───────────────────────────────────────────
@@ -1438,7 +1520,7 @@
       for (const stage of STAGE_ORDER) {
         const stageStaff = staff
           .filter(p => p.stage === stage)
-          .sort((a, b) => DEPT_ORDER.indexOf(a.department) - DEPT_ORDER.indexOf(b.department));
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
         if (stageStaff.length === 0) continue;
 
         html += `
@@ -1486,21 +1568,8 @@
             if (p.lastDay) dateLines += `<div class="card-start">Last Day of Work: ${fmtDate(p.lastDay)}</div>`;
           }
 
-          html += `
-              <div class="person-card">
-                <div class="card-top">
-                  <div>
-                    <div class="card-name">${esc(p.name)}${remoteBadge}</div>
-                    <div class="card-jobtitle">${esc(p.jobTitle)}</div>
-                    <div class="card-dept">${esc(p.department)}</div>
-                    ${coachLine}
-                    ${dateLines}
-                  </div>
-                  <div class="card-btns">
-                    <button class="btn btn-ghost-edit" onclick="openModal('${p.id}')">Edit</button>
-                    <button class="btn btn-ghost-delete" onclick="deletePerson('${p.id}')">Delete</button>
-                  </div>
-                </div>
+          // Task progress — hidden for Induction
+          const progressHtml = p.stage !== 'Induction' ? `
                 <div class="progress-row">
                   <span class="tasks-label">Tasks completed</span>
                   <div class="tasks-right">
@@ -1520,7 +1589,31 @@
                 </div>
                 <div class="bar-track">
                   <div class="bar-fill" id="bar-${p.id}" style="width:${pct}%"></div>
+                </div>` : '';
+
+          html += `
+              <div class="person-card"
+                id="card-${p.id}"
+                draggable="true"
+                ondragstart="onDragStart(event,'${p.id}')"
+                ondragend="onDragEnd(event)"
+                ondragover="onDragOver(event,'${p.id}')"
+                ondragleave="onDragLeave(event)"
+                ondrop="onDrop(event,'${p.id}')">
+                <div class="card-top">
+                  <div>
+                    <div class="card-name">${esc(p.name)}${remoteBadge}</div>
+                    <div class="card-jobtitle">${esc(p.jobTitle)}</div>
+                    <div class="card-dept">${esc(p.department)}</div>
+                    ${coachLine}
+                    ${dateLines}
+                  </div>
+                  <div class="card-btns">
+                    <button class="btn btn-ghost-edit" onclick="openModal('${p.id}')">Edit</button>
+                    <button class="btn btn-ghost-delete" onclick="deletePerson('${p.id}')">Delete</button>
+                  </div>
                 </div>
+                ${progressHtml}
                 ${weekHtml}
                 <div class="notes-section">
                   <button class="notes-toggle" onclick="toggleNotes('${p.id}')">
@@ -1556,7 +1649,7 @@
       document.getElementById('dashboard').innerHTML =
         '<div class="loading-state"><div class="loading-spinner"></div><p>Loading staff data…</p></div>';
 
-      const { data, error } = await db.from('slide_staff').select('*').order('saved_at', { ascending: true });
+      const { data, error } = await db.from('slide_staff').select('*').order('sort_order', { ascending: true }).order('saved_at', { ascending: true });
       if (error) {
         document.getElementById('dashboard').innerHTML =
           `<div class="empty-state"><h3>Could not load data</h3><p>${esc(error.message)}</p></div>`;
