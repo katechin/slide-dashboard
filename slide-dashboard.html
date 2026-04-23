@@ -657,14 +657,27 @@
     }
 
     .pct-badge {
-      font-size: 0.8rem;
-      font-weight: 700;
-      min-width: 36px;
+      font-size: 2.25rem;
+      font-weight: 800;
+      min-width: 70px;
       text-align: right;
-      color: var(--text-primary);
+      line-height: 1;
+      letter-spacing: -0.04em;
+      flex-shrink: 0;
+    }
+
+    .pct-Onboarding  { color: #3d8f83; }
+    .pct-Induction   { color: #9e6898; }
+    .pct-Offboarding { color: #a07800; }
+
+    .bar-with-pct {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
     }
 
     .bar-track {
+      flex: 1;
       height: 7px;
       background: rgba(60, 50, 40, 0.08);
       border-radius: 100px;
@@ -1061,7 +1074,14 @@
     }
 
     function uid() {
-      return crypto.randomUUID();
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      // Fallback: RFC 4122 UUID v4
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
     }
 
     // ─── Task total logic ──────────────────────────────────
@@ -1584,11 +1604,13 @@
                       onchange="updateTasks('${p.id}', this.value)"
                     />
                     <span class="tasks-of">/ ${total}</span>
-                    <span class="pct-badge" id="pct-${p.id}">${pct}%</span>
                   </div>
                 </div>
-                <div class="bar-track">
-                  <div class="bar-fill" id="bar-${p.id}" style="width:${pct}%"></div>
+                <div class="bar-with-pct">
+                  <div class="bar-track">
+                    <div class="bar-fill" id="bar-${p.id}" style="width:${pct}%"></div>
+                  </div>
+                  <span class="pct-badge pct-${p.stage}" id="pct-${p.id}">${pct}%</span>
                 </div>` : '';
 
           html += `
