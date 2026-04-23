@@ -1365,19 +1365,19 @@
 
     // ─── Save / Delete ─────────────────────────────────────
     async function savePerson() {
-      const name       = document.getElementById('f-name').value.trim();
-      const coachSel   = document.getElementById('f-coach').value;
-      const coachName  = coachSel === '__other__'
-                           ? document.getElementById('f-coach-other').value.trim()
-                           : coachSel;
-      const department = document.getElementById('f-dept').value;
-      const jobTitle   = document.getElementById('f-title').value;
-      const stage          = document.getElementById('f-stage').value;
-      const firstDayInput  = document.getElementById('f-first-day').value || '';
-      const lastDay        = document.getElementById('f-last-day').value  || '';
-      const remote         = REMOTE_DEPTS.includes(department)
-                               ? document.getElementById('f-remote').checked
-                               : false;
+      const name          = document.getElementById('f-name').value.trim();
+      const coachSel      = document.getElementById('f-coach').value;
+      const coachName     = coachSel === '__other__'
+                              ? document.getElementById('f-coach-other').value.trim()
+                              : coachSel;
+      const department    = document.getElementById('f-dept').value;
+      const jobTitle      = document.getElementById('f-title').value;
+      const stage         = document.getElementById('f-stage').value;
+      const firstDayInput = document.getElementById('f-first-day').value || '';
+      const lastDay       = document.getElementById('f-last-day').value  || '';
+      const remote        = REMOTE_DEPTS.includes(department)
+                              ? document.getElementById('f-remote').checked
+                              : false;
 
       // Induction uses a single "First Day of Work" field for both dates
       let startDate, firstDay;
@@ -1390,38 +1390,50 @@
       }
 
       if (!name || !department || !jobTitle || !stage || !startDate) {
-        alert('Please fill in all fields before saving.');
+        alert('Please fill in all required fields before saving.');
         return;
       }
 
       const saveBtn = document.querySelector('.modal-footer .btn-primary');
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving…';
+      const resetBtn = () => {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+      };
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
       let person;
-      if (editId) {
-        const i = staff.findIndex(p => p.id === editId);
-        if (i !== -1) {
+      let isNew       = false;
+      let prevStaff   = null;
+
+      try {
+        if (editId) {
+          const i = staff.findIndex(p => p.id === editId);
+          if (i === -1) throw new Error('Person not found — please refresh and try again.');
+          prevStaff = [...staff];
           person = { ...staff[i], name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote };
           person.tasksCompleted = Math.min(person.tasksCompleted, getTaskTotal(person));
           staff[i] = person;
+        } else {
+          isNew = true;
+          const sortOrder = staff.filter(p => p.stage === stage).length;
+          person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder };
+          staff.push(person);
         }
-      } else {
-        const sortOrder = staff.filter(p => p.stage === stage).length;
-        person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder };
-        staff.push(person);
-      }
 
-      const { error } = await db.from('slide_staff').upsert(toRow(person));
-      if (error) {
-        alert('Error saving: ' + error.message);
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-        return;
-      }
+        const { error } = await db.from('slide_staff').upsert(toRow(person));
+        if (error) throw new Error(error.message);
 
-      closeModal();
-      render();
+        closeModal();
+        render();
+      } catch (err) {
+        // Roll back local state so the dashboard stays consistent
+        if (isNew && person) {
+          staff = staff.filter(p => p.id !== person.id);
+        } else if (prevStaff) {
+          staff = prevStaff;
+        }
+        resetBtn();
+        alert('Save failed — ' + (err.message || 'please try again.'));
+      }
     }
 
     async function deletePerson(id) {
