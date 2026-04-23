@@ -674,6 +674,73 @@
       display: flex;
       align-items: center;
       gap: 0.85rem;
+      position: relative;
+    }
+
+    .pct-badge-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    /* ─── Induction alert badge ──────────────────────────── */
+    .induction-alert {
+      position: absolute;
+      top: -8px;
+      right: -7px;
+      width: 18px;
+      height: 18px;
+      background: var(--danger);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 900;
+      line-height: 1;
+      cursor: default;
+      box-shadow: 0 2px 5px rgba(201, 79, 79, 0.4);
+      z-index: 2;
+    }
+
+    /* ─── Coach active state (induction started) ─────────── */
+    .card-coach-active {
+      font-size: 0.67rem;
+      margin-top: 0.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--text-muted);
+      cursor: default;
+    }
+
+    .card-coach-active strong {
+      font-weight: 700;
+      color: #9e6898;
+    }
+
+    .coach-active-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #c49abd;
+      flex-shrink: 0;
+    }
+
+    /* ─── Auto-trigger tag on Onboarding cards in Induction ─ */
+    .induction-auto-tag {
+      display: inline-block;
+      font-size: 0.59rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #9e6898;
+      background: rgba(196, 154, 189, 0.15);
+      border: 1px solid rgba(196, 154, 189, 0.32);
+      border-radius: 100px;
+      padding: 0.08rem 0.45rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
     }
 
     .bar-track {
@@ -1520,6 +1587,17 @@
       return { future: false, week };
     }
 
+    // True when p.firstDay has arrived or passed (local midnight, not UTC)
+    function inductionStarted(p) {
+      if (!p.firstDay) return false;
+      const [y, m, d] = p.firstDay.split('-').map(Number);
+      const start = new Date(y, m - 1, d);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      return today >= start;
+    }
+
     // ─── Render Summary ────────────────────────────────────
     function renderSummary() {
       const counts = { Onboarding: 0, Induction: 0, Offboarding: 0 };
@@ -1573,9 +1651,15 @@
       let html = '';
 
       for (const stage of STAGE_ORDER) {
-        const stageStaff = staff
+        let stageStaff = staff
           .filter(p => p.stage === stage)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        if (stage === 'Induction') {
+          const autoTriggered = staff
+            .filter(p => p.stage === 'Onboarding' && inductionStarted(p))
+            .sort((a, b) => (a.firstDay || '').localeCompare(b.firstDay || ''));
+          stageStaff = [...autoTriggered, ...stageStaff];
+        }
         if (stageStaff.length === 0) continue;
 
         html += `
@@ -1588,16 +1672,20 @@
             <div class="cards-grid">`;
 
         for (const p of stageStaff) {
-          const total    = getTaskTotal(p);
-          const pct      = Math.round((p.tasksCompleted / total) * 100);
-          const hasNotes = !!(p.notes && p.notes.trim());
-          const remoteBadge = (REMOTE_DEPTS.includes(p.department) && p.remote)
+          const total           = getTaskTotal(p);
+          const pct             = Math.round((p.tasksCompleted / total) * 100);
+          const hasNotes        = !!(p.notes && p.notes.trim());
+          const isAutoTriggered = stage === 'Induction' && p.stage === 'Onboarding';
+          const inductionActive = p.stage === 'Onboarding' && inductionStarted(p);
+          const remoteBadge     = (REMOTE_DEPTS.includes(p.department) && p.remote)
             ? `<span class="remote-badge">Remote</span>`
             : '';
 
-          // Coach line
+          // Coach line — bold with dot when induction is active on an Onboarding card
           const coachLine = p.coachName
-            ? `<div class="card-coach">Coach: ${esc(p.coachName)}</div>`
+            ? (inductionActive
+                ? `<div class="card-coach-active" title="Induction active — coach is now primary contact."><span class="coach-active-dot"></span><span>Coach: <strong>${esc(p.coachName)}</strong></span></div>`
+                : `<div class="card-coach">Coach: ${esc(p.coachName)}</div>`)
             : '';
 
           // Week counter (Onboarding + Induction only)
@@ -1623,7 +1711,9 @@
             if (p.lastDay) dateLines += `<div class="card-start">Last Day of Work: ${fmtDate(p.lastDay)}</div>`;
           }
 
-          // Task progress — hidden for Induction
+          // Task progress — hidden for explicit Induction stage cards only
+          // Auto-triggered Onboarding cards still show progress
+          const showAlert   = inductionActive && pct < 100;
           const progressHtml = p.stage !== 'Induction' ? `
                 <div class="progress-row">
                   <span class="tasks-label">Tasks completed</span>
@@ -1645,7 +1735,10 @@
                   <div class="bar-track">
                     <div class="bar-fill" id="bar-${p.id}" style="width:${pct}%"></div>
                   </div>
-                  <span class="pct-badge pct-${p.stage}" id="pct-${p.id}">${pct}%</span>
+                  <span class="pct-badge-wrap">
+                    ${showAlert ? `<span class="induction-alert" title="Induction has started — onboarding tasks still incomplete.">!</span>` : ''}
+                    <span class="pct-badge pct-${p.stage}" id="pct-${p.id}">${pct}%</span>
+                  </span>
                 </div>` : '';
 
           html += `
@@ -1659,7 +1752,7 @@
                 ondrop="onDrop(event,'${p.id}')">
                 <div class="card-top">
                   <div>
-                    <div class="card-name">${esc(p.name)}${remoteBadge}</div>
+                    <div class="card-name">${esc(p.name)}${remoteBadge}${isAutoTriggered ? '<span class="induction-auto-tag">Onboarding</span>' : ''}</div>
                     <div class="card-jobtitle">${esc(p.jobTitle)}</div>
                     <div class="card-dept">${esc(p.department)}</div>
                     ${coachLine}
