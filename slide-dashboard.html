@@ -1676,12 +1676,13 @@
           const pct             = Math.round((p.tasksCompleted / total) * 100);
           const hasNotes        = !!(p.notes && p.notes.trim());
           const isAutoTriggered = stage === 'Induction' && p.stage === 'Onboarding';
-          const inductionActive = p.stage === 'Onboarding' && inductionStarted(p);
+          // inductionActive only applies to Onboarding-section cards (not their mirror in Induction)
+          const inductionActive = p.stage === 'Onboarding' && !isAutoTriggered && inductionStarted(p);
           const remoteBadge     = (REMOTE_DEPTS.includes(p.department) && p.remote)
             ? `<span class="remote-badge">Remote</span>`
             : '';
 
-          // Coach line — bold with dot when induction is active on an Onboarding card
+          // Coach line — bold with dot only on Onboarding-section cards where induction is active
           const coachLine = p.coachName
             ? (inductionActive
                 ? `<div class="card-coach-active" title="Induction active — coach is now primary contact."><span class="coach-active-dot"></span><span>Coach: <strong>${esc(p.coachName)}</strong></span></div>`
@@ -1690,7 +1691,7 @@
 
           // Week counter (Onboarding + Induction only)
           let weekHtml = '';
-          if ((p.stage === 'Onboarding' || p.stage === 'Induction') && p.firstDay) {
+          if ((p.stage === 'Onboarding' || p.stage === 'Induction' || isAutoTriggered) && p.firstDay) {
             const wi = inductionWeekInfo(p.firstDay);
             if (wi) {
               weekHtml = wi.future
@@ -1700,21 +1701,21 @@
           }
 
           // Stage-specific date lines
+          // Auto-triggered cards render in Induction format regardless of p.stage
           let dateLines = '';
-          if (p.stage === 'Onboarding') {
+          if (isAutoTriggered || p.stage === 'Induction') {
+            dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay || p.startDate)}</div>`;
+          } else if (p.stage === 'Onboarding') {
             dateLines += `<div class="card-start">SLIDE Started: ${fmtDate(p.startDate)}</div>`;
             if (p.firstDay) dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay)}</div>`;
-          } else if (p.stage === 'Induction') {
-            dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay || p.startDate)}</div>`;
           } else if (p.stage === 'Offboarding') {
             dateLines += `<div class="card-start">SLIDE Offboarding Started: ${fmtDate(p.startDate)}</div>`;
             if (p.lastDay) dateLines += `<div class="card-start">Last Day of Work: ${fmtDate(p.lastDay)}</div>`;
           }
 
-          // Task progress — hidden for explicit Induction stage cards only
-          // Auto-triggered Onboarding cards still show progress
-          const showAlert   = inductionActive && pct < 100;
-          const progressHtml = p.stage !== 'Induction' ? `
+          // Task progress — hidden for Induction stage AND auto-triggered cards
+          const showAlert    = inductionActive && pct < 100;
+          const progressHtml = (p.stage !== 'Induction' && !isAutoTriggered) ? `
                 <div class="progress-row">
                   <span class="tasks-label">Tasks completed</span>
                   <div class="tasks-right">
@@ -1752,7 +1753,7 @@
                 ondrop="onDrop(event,'${p.id}')">
                 <div class="card-top">
                   <div>
-                    <div class="card-name">${esc(p.name)}${remoteBadge}${isAutoTriggered ? '<span class="induction-auto-tag">Onboarding</span>' : ''}</div>
+                    <div class="card-name">${esc(p.name)}${remoteBadge}</div>
                     <div class="card-jobtitle">${esc(p.jobTitle)}</div>
                     <div class="card-dept">${esc(p.department)}</div>
                     ${coachLine}
