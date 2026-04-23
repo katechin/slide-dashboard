@@ -666,6 +666,43 @@
       min-width: 0;
     }
 
+    /* ─── Coach + Week meta on card ─────────────────────── */
+    .card-coach {
+      font-size: 0.67rem;
+      color: var(--text-muted);
+      margin-top: 0.1rem;
+    }
+
+    .card-week-row {
+      display: flex;
+      align-items: center;
+      margin-top: 0.6rem;
+    }
+
+    .week-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      border-radius: 100px;
+      padding: 0.2rem 0.65rem;
+      border: 1px solid;
+    }
+
+    .week-badge.active {
+      color: #2d7a70;
+      background: rgba(123, 196, 184, 0.18);
+      border-color: rgba(123, 196, 184, 0.5);
+    }
+
+    .week-badge.future {
+      color: var(--text-secondary);
+      background: var(--bg-card-alt);
+      border-color: var(--border);
+    }
+
     /* ─── Empty State ─────────────────────────────────── */
     .empty-state {
       text-align: center;
@@ -757,6 +794,10 @@
         <input type="text" id="f-name" placeholder="e.g. Dr. Jane Smith" autocomplete="off" />
       </div>
       <div class="form-row">
+        <label for="f-coach">Coach Name</label>
+        <input type="text" id="f-coach" placeholder="e.g. Sarah Chen" autocomplete="off" />
+      </div>
+      <div class="form-row">
         <label for="f-dept">Department</label>
         <select id="f-dept" onchange="onDeptChange()">
           <option value="">Select a department...</option>
@@ -797,6 +838,14 @@
       <div class="form-row">
         <label for="f-date" id="f-date-label">Start Date</label>
         <input type="date" id="f-date" />
+      </div>
+      <div class="form-row" id="first-day-row" style="display:none">
+        <label for="f-first-day">First Day</label>
+        <input type="date" id="f-first-day" />
+      </div>
+      <div class="form-row" id="last-day-row" style="display:none">
+        <label for="f-last-day">Last Day</label>
+        <input type="date" id="f-last-day" />
       </div>
 
       <div class="modal-footer">
@@ -892,13 +941,16 @@
       return {
         id:              p.id,
         staff_name:      p.name,
+        coach_name:      p.coachName  || '',
         department:      p.department,
         job_title:       p.jobTitle,
         stage:           p.stage,
         tasks_completed: p.tasksCompleted,
         total_tasks:     getTaskTotal(p),
         start_date:      p.startDate,
-        notes:           p.notes || '',
+        first_day:       p.firstDay   || null,
+        last_day:        p.lastDay    || null,
+        notes:           p.notes      || '',
         is_remote:       !!p.remote,
         saved_at:        new Date().toISOString()
       };
@@ -908,12 +960,15 @@
       return {
         id:             row.id,
         name:           row.staff_name,
+        coachName:      row.coach_name  || '',
         department:     row.department,
         jobTitle:       row.job_title,
         stage:          row.stage,
         tasksCompleted: row.tasks_completed || 0,
         startDate:      row.start_date,
-        notes:          row.notes || '',
+        firstDay:       row.first_day   || '',
+        lastDay:        row.last_day    || '',
+        notes:          row.notes       || '',
         remote:         !!row.is_remote
       };
     }
@@ -940,11 +995,23 @@
       }
     }
 
-    // ─── Stage change: update date field label ────────────
+    // ─── Stage change: update label + show/hide date fields ─
     function onStageChange() {
-      const stage = document.getElementById('f-stage').value;
-      const label = document.getElementById('f-date-label');
+      const stage       = document.getElementById('f-stage').value;
+      const label       = document.getElementById('f-date-label');
+      const firstDayRow = document.getElementById('first-day-row');
+      const lastDayRow  = document.getElementById('last-day-row');
+
       label.textContent = stage ? stage + ' Start Date' : 'Start Date';
+
+      const hasFirst = ['Onboarding', 'Induction'].includes(stage);
+      const hasLast  = stage === 'Offboarding';
+
+      firstDayRow.style.display = hasFirst ? '' : 'none';
+      lastDayRow.style.display  = hasLast  ? '' : 'none';
+
+      if (!hasFirst) document.getElementById('f-first-day').value = '';
+      if (!hasLast)  document.getElementById('f-last-day').value  = '';
     }
 
     // ─── Department change: populate Job Title dropdown ────
@@ -989,22 +1056,26 @@
 
       if (id) {
         const p = staff.find(x => x.id === id);
-        document.getElementById('f-name').value     = p.name;
-        document.getElementById('f-dept').value     = p.department;
-        onDeptChange(); // populate job title options before setting value
-        document.getElementById('f-title').value    = p.jobTitle;
-        document.getElementById('f-stage').value    = p.stage;
-        document.getElementById('f-date').value     = p.startDate;
-        document.getElementById('f-remote').checked = !!p.remote;
+        document.getElementById('f-name').value      = p.name;
+        document.getElementById('f-coach').value     = p.coachName || '';
+        document.getElementById('f-dept').value      = p.department;
+        onDeptChange();
+        document.getElementById('f-title').value     = p.jobTitle;
+        document.getElementById('f-stage').value     = p.stage;
+        document.getElementById('f-date').value      = p.startDate;
+        document.getElementById('f-remote').checked  = !!p.remote;
         onStageChange();
+        document.getElementById('f-first-day').value = p.firstDay  || '';
+        document.getElementById('f-last-day').value  = p.lastDay   || '';
       } else {
-        document.getElementById('f-name').value     = '';
-        document.getElementById('f-dept').value     = '';
-        document.getElementById('f-stage').value    = '';
-        document.getElementById('f-date').value     = '';
-        document.getElementById('f-remote').checked = false;
-        onDeptChange(); // reset job title dropdown + hide remote toggle
-        onStageChange(); // reset date label
+        document.getElementById('f-name').value      = '';
+        document.getElementById('f-coach').value     = '';
+        document.getElementById('f-dept').value      = '';
+        document.getElementById('f-stage').value     = '';
+        document.getElementById('f-date').value      = '';
+        document.getElementById('f-remote').checked  = false;
+        onDeptChange();
+        onStageChange();
       }
       document.getElementById('overlay').classList.add('open');
       setTimeout(() => document.getElementById('f-name').focus(), 80);
@@ -1018,10 +1089,13 @@
     // ─── Save / Delete ─────────────────────────────────────
     async function savePerson() {
       const name       = document.getElementById('f-name').value.trim();
+      const coachName  = document.getElementById('f-coach').value.trim();
       const department = document.getElementById('f-dept').value;
       const jobTitle   = document.getElementById('f-title').value;
       const stage      = document.getElementById('f-stage').value;
       const startDate  = document.getElementById('f-date').value;
+      const firstDay   = document.getElementById('f-first-day').value || '';
+      const lastDay    = document.getElementById('f-last-day').value  || '';
       const remote     = REMOTE_DEPTS.includes(department)
                            ? document.getElementById('f-remote').checked
                            : false;
@@ -1039,12 +1113,12 @@
       if (editId) {
         const i = staff.findIndex(p => p.id === editId);
         if (i !== -1) {
-          person = { ...staff[i], name, department, jobTitle, stage, startDate, remote };
+          person = { ...staff[i], name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote };
           person.tasksCompleted = Math.min(person.tasksCompleted, getTaskTotal(person));
           staff[i] = person;
         }
       } else {
-        person = { id: uid(), name, department, jobTitle, stage, startDate, remote, tasksCompleted: 0, notes: '' };
+        person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '' };
         staff.push(person);
       }
 
@@ -1139,6 +1213,21 @@
       });
     }
 
+    // ─── Induction week from First Day ─────────────────────
+    // Returns { future: true, label } or { future: false, week: N }
+    function inductionWeekInfo(firstDayStr) {
+      if (!firstDayStr) return null;
+      const [y, m, d] = firstDayStr.split('-').map(Number);
+      const start = new Date(y, m - 1, d);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      const diffMs = today - start;
+      if (diffMs < 0) return { future: true, label: fmtDate(firstDayStr) };
+      const week = Math.min(Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1, 26);
+      return { future: false, week };
+    }
+
     // ─── Render Summary ────────────────────────────────────
     function renderSummary() {
       const counts = { Onboarding: 0, Induction: 0, Offboarding: 0 };
@@ -1221,13 +1310,36 @@
               ? `<span class="remote-badge">Remote</span>`
               : '';
 
+            // Coach line
+            const coachLine = p.coachName
+              ? `<div class="card-coach">Coach: ${esc(p.coachName)}</div>`
+              : '';
+
+            // Week counter (Onboarding + Induction only)
+            let weekHtml = '';
+            if ((p.stage === 'Onboarding' || p.stage === 'Induction') && p.firstDay) {
+              const wi = inductionWeekInfo(p.firstDay);
+              if (wi) {
+                weekHtml = wi.future
+                  ? `<div class="card-week-row"><span class="week-badge future">Starting ${wi.label}</span></div>`
+                  : `<div class="card-week-row"><span class="week-badge active">Week ${wi.week} of 26</span></div>`;
+              }
+            }
+
+            // Last day line (Offboarding only)
+            const lastDayLine = (p.stage === 'Offboarding' && p.lastDay)
+              ? `<div class="card-start">Last day: ${fmtDate(p.lastDay)}</div>`
+              : '';
+
             html += `
               <div class="person-card">
                 <div class="card-top">
                   <div>
                     <div class="card-name">${esc(p.name)}${remoteBadge}</div>
                     <div class="card-jobtitle">${esc(p.jobTitle)}</div>
+                    ${coachLine}
                     <div class="card-start">Started ${fmtDate(p.startDate)}</div>
+                    ${lastDayLine}
                   </div>
                   <div class="card-btns">
                     <button class="btn btn-ghost-edit" onclick="openModal('${p.id}')">Edit</button>
@@ -1254,6 +1366,7 @@
                 <div class="bar-track">
                   <div class="bar-fill" id="bar-${p.id}" style="width:${pct}%"></div>
                 </div>
+                ${weekHtml}
                 <div class="notes-section">
                   <button class="notes-toggle" onclick="toggleNotes('${p.id}')">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
