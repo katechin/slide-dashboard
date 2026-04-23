@@ -794,8 +794,14 @@
         <input type="text" id="f-name" placeholder="e.g. Dr. Jane Smith" autocomplete="off" />
       </div>
       <div class="form-row">
-        <label for="f-coach">Coach Name</label>
-        <input type="text" id="f-coach" placeholder="e.g. Sarah Chen" autocomplete="off" />
+        <label for="f-coach">Coach</label>
+        <select id="f-coach" onchange="onCoachChange()" disabled>
+          <option value="">Select department first...</option>
+        </select>
+      </div>
+      <div class="form-row" id="coach-other-row" style="display:none">
+        <label for="f-coach-other">Coach Name (specify)</label>
+        <input type="text" id="f-coach-other" placeholder="Enter coach name..." autocomplete="off" />
       </div>
       <div class="form-row">
         <label for="f-dept">Department</label>
@@ -932,6 +938,16 @@
       'PST':                   'ico-pso'
     };
 
+    const DEPT_COACHES = {
+      'Reception':             ['Megan Wright', 'Shae Connors', 'Lisa Martin'],
+      'Business':              ['John Deery'],
+      'Nursing':               ['Micah Haly'],
+      'GP':                    ['Mel Deery'],
+      'Finance':               ['Aiden Chang'],
+      'Projects & Innovation': ['Kenneth Lobo'],
+      'PST':                   ['Jess Hinchy']
+    };
+
     // ─── State ─────────────────────────────────────────────
     let staff  = [];
     let editId = null;
@@ -1014,12 +1030,15 @@
       if (!hasLast)  document.getElementById('f-last-day').value  = '';
     }
 
-    // ─── Department change: populate Job Title dropdown ────
+    // ─── Department change: populate Job Title + Coach dropdowns ─
     function onDeptChange() {
-      const dept   = document.getElementById('f-dept').value;
-      const select = document.getElementById('f-title');
-      const remRow = document.getElementById('remote-row');
+      const dept      = document.getElementById('f-dept').value;
+      const select    = document.getElementById('f-title');
+      const remRow    = document.getElementById('remote-row');
+      const coachSel  = document.getElementById('f-coach');
+      const otherRow  = document.getElementById('coach-other-row');
 
+      // ── Job Title ──
       select.innerHTML = '';
       if (!dept) {
         select.innerHTML = '<option value="">Select department first...</option>';
@@ -1041,12 +1060,46 @@
         }
       }
 
+      // ── Coach ──
+      coachSel.innerHTML = '';
+      if (!dept) {
+        coachSel.innerHTML = '<option value="">Select department first...</option>';
+        coachSel.disabled = true;
+      } else {
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = 'Select a coach...';
+        coachSel.appendChild(ph);
+        (DEPT_COACHES[dept] || []).forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          coachSel.appendChild(opt);
+        });
+        const otherOpt = document.createElement('option');
+        otherOpt.value = '__other__';
+        otherOpt.textContent = 'Other (please specify)';
+        coachSel.appendChild(otherOpt);
+        coachSel.disabled = false;
+      }
+      otherRow.style.display = 'none';
+      document.getElementById('f-coach-other').value = '';
+
+      // ── Remote toggle ──
       if (REMOTE_DEPTS.includes(dept)) {
         remRow.style.display = '';
       } else {
         remRow.style.display = 'none';
         document.getElementById('f-remote').checked = false;
       }
+    }
+
+    // ─── Coach dropdown change ─────────────────────────────
+    function onCoachChange() {
+      const val      = document.getElementById('f-coach').value;
+      const otherRow = document.getElementById('coach-other-row');
+      otherRow.style.display = val === '__other__' ? '' : 'none';
+      if (val !== '__other__') document.getElementById('f-coach-other').value = '';
     }
 
     // ─── Modal ─────────────────────────────────────────────
@@ -1057,10 +1110,20 @@
       if (id) {
         const p = staff.find(x => x.id === id);
         document.getElementById('f-name').value      = p.name;
-        document.getElementById('f-coach').value     = p.coachName || '';
         document.getElementById('f-dept').value      = p.department;
-        onDeptChange();
+        onDeptChange(); // populates job title + coach dropdowns
         document.getElementById('f-title').value     = p.jobTitle;
+        // Restore coach: preset name, 'Other', or blank
+        const coaches = DEPT_COACHES[p.department] || [];
+        if (p.coachName && coaches.includes(p.coachName)) {
+          document.getElementById('f-coach').value = p.coachName;
+        } else if (p.coachName) {
+          document.getElementById('f-coach').value          = '__other__';
+          document.getElementById('f-coach-other').value    = p.coachName;
+          document.getElementById('coach-other-row').style.display = '';
+        } else {
+          document.getElementById('f-coach').value = '';
+        }
         document.getElementById('f-stage').value     = p.stage;
         document.getElementById('f-date').value      = p.startDate;
         document.getElementById('f-remote').checked  = !!p.remote;
@@ -1069,7 +1132,6 @@
         document.getElementById('f-last-day').value  = p.lastDay   || '';
       } else {
         document.getElementById('f-name').value      = '';
-        document.getElementById('f-coach').value     = '';
         document.getElementById('f-dept').value      = '';
         document.getElementById('f-stage').value     = '';
         document.getElementById('f-date').value      = '';
@@ -1089,7 +1151,10 @@
     // ─── Save / Delete ─────────────────────────────────────
     async function savePerson() {
       const name       = document.getElementById('f-name').value.trim();
-      const coachName  = document.getElementById('f-coach').value.trim();
+      const coachSel   = document.getElementById('f-coach').value;
+      const coachName  = coachSel === '__other__'
+                           ? document.getElementById('f-coach-other').value.trim()
+                           : coachSel;
       const department = document.getElementById('f-dept').value;
       const jobTitle   = document.getElementById('f-title').value;
       const stage      = document.getElementById('f-stage').value;
