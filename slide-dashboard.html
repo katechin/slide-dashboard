@@ -841,16 +841,16 @@
           <option value="Offboarding">Offboarding</option>
         </select>
       </div>
-      <div class="form-row">
-        <label for="f-date" id="f-date-label">Start Date</label>
+      <div class="form-row" id="date-row">
+        <label for="f-date" id="f-date-label">SLIDE Process Start Date</label>
         <input type="date" id="f-date" />
       </div>
       <div class="form-row" id="first-day-row" style="display:none">
-        <label for="f-first-day">First Day</label>
+        <label for="f-first-day">First Day of Work</label>
         <input type="date" id="f-first-day" />
       </div>
       <div class="form-row" id="last-day-row" style="display:none">
-        <label for="f-last-day">Last Day</label>
+        <label for="f-last-day">Last Day of Work</label>
         <input type="date" id="f-last-day" />
       </div>
 
@@ -1011,23 +1011,44 @@
       }
     }
 
-    // ─── Stage change: update label + show/hide date fields ─
+    // ─── Stage change: per-stage field visibility ─────────
     function onStageChange() {
       const stage       = document.getElementById('f-stage').value;
+      const dateRow     = document.getElementById('date-row');
       const label       = document.getElementById('f-date-label');
       const firstDayRow = document.getElementById('first-day-row');
       const lastDayRow  = document.getElementById('last-day-row');
 
-      label.textContent = stage ? stage + ' Start Date' : 'Start Date';
-
-      const hasFirst = ['Onboarding', 'Induction'].includes(stage);
-      const hasLast  = stage === 'Offboarding';
-
-      firstDayRow.style.display = hasFirst ? '' : 'none';
-      lastDayRow.style.display  = hasLast  ? '' : 'none';
-
-      if (!hasFirst) document.getElementById('f-first-day').value = '';
-      if (!hasLast)  document.getElementById('f-last-day').value  = '';
+      if (stage === 'Onboarding') {
+        // SLIDE Process Start Date + First Day of Work (separate)
+        dateRow.style.display     = '';
+        label.textContent         = 'SLIDE Process Start Date';
+        firstDayRow.style.display = '';
+        lastDayRow.style.display  = 'none';
+        document.getElementById('f-last-day').value = '';
+      } else if (stage === 'Induction') {
+        // Single "First Day of Work" — same date as SLIDE start for induction
+        dateRow.style.display     = 'none';
+        document.getElementById('f-date').value = '';
+        firstDayRow.style.display = '';
+        lastDayRow.style.display  = 'none';
+        document.getElementById('f-last-day').value = '';
+      } else if (stage === 'Offboarding') {
+        // SLIDE Offboarding Start Date + Last Day of Work
+        dateRow.style.display     = '';
+        label.textContent         = 'SLIDE Offboarding Start Date';
+        firstDayRow.style.display = 'none';
+        document.getElementById('f-first-day').value = '';
+        lastDayRow.style.display  = '';
+      } else {
+        // No stage selected — show start date row only
+        dateRow.style.display     = '';
+        label.textContent         = 'SLIDE Process Start Date';
+        firstDayRow.style.display = 'none';
+        lastDayRow.style.display  = 'none';
+        document.getElementById('f-first-day').value = '';
+        document.getElementById('f-last-day').value  = '';
+      }
     }
 
     // ─── Department change: populate Job Title + Coach dropdowns ─
@@ -1124,12 +1145,17 @@
         } else {
           document.getElementById('f-coach').value = '';
         }
-        document.getElementById('f-stage').value     = p.stage;
-        document.getElementById('f-date').value      = p.startDate;
-        document.getElementById('f-remote').checked  = !!p.remote;
-        onStageChange();
-        document.getElementById('f-first-day').value = p.firstDay  || '';
-        document.getElementById('f-last-day').value  = p.lastDay   || '';
+        document.getElementById('f-stage').value    = p.stage;
+        document.getElementById('f-remote').checked = !!p.remote;
+        onStageChange(); // sets visibility + clears irrelevant fields
+        // Restore date fields based on stage (after onStageChange clears them)
+        if (p.stage === 'Induction') {
+          document.getElementById('f-first-day').value = p.firstDay || p.startDate || '';
+        } else {
+          document.getElementById('f-date').value      = p.startDate || '';
+          document.getElementById('f-first-day').value = p.firstDay  || '';
+          document.getElementById('f-last-day').value  = p.lastDay   || '';
+        }
       } else {
         document.getElementById('f-name').value      = '';
         document.getElementById('f-dept').value      = '';
@@ -1157,13 +1183,22 @@
                            : coachSel;
       const department = document.getElementById('f-dept').value;
       const jobTitle   = document.getElementById('f-title').value;
-      const stage      = document.getElementById('f-stage').value;
-      const startDate  = document.getElementById('f-date').value;
-      const firstDay   = document.getElementById('f-first-day').value || '';
-      const lastDay    = document.getElementById('f-last-day').value  || '';
-      const remote     = REMOTE_DEPTS.includes(department)
-                           ? document.getElementById('f-remote').checked
-                           : false;
+      const stage          = document.getElementById('f-stage').value;
+      const firstDayInput  = document.getElementById('f-first-day').value || '';
+      const lastDay        = document.getElementById('f-last-day').value  || '';
+      const remote         = REMOTE_DEPTS.includes(department)
+                               ? document.getElementById('f-remote').checked
+                               : false;
+
+      // Induction uses a single "First Day of Work" field for both dates
+      let startDate, firstDay;
+      if (stage === 'Induction') {
+        startDate = firstDayInput;
+        firstDay  = firstDayInput;
+      } else {
+        startDate = document.getElementById('f-date').value;
+        firstDay  = firstDayInput;
+      }
 
       if (!name || !department || !jobTitle || !stage || !startDate) {
         alert('Please fill in all fields before saving.');
@@ -1386,15 +1421,22 @@
               const wi = inductionWeekInfo(p.firstDay);
               if (wi) {
                 weekHtml = wi.future
-                  ? `<div class="card-week-row"><span class="week-badge future">Starting ${wi.label}</span></div>`
+                  ? `<div class="card-week-row"><span class="week-badge future">First Day: ${wi.label}</span></div>`
                   : `<div class="card-week-row"><span class="week-badge active">Week ${wi.week} of 26</span></div>`;
               }
             }
 
-            // Last day line (Offboarding only)
-            const lastDayLine = (p.stage === 'Offboarding' && p.lastDay)
-              ? `<div class="card-start">Last day: ${fmtDate(p.lastDay)}</div>`
-              : '';
+            // Stage-specific date lines
+            let dateLines = '';
+            if (p.stage === 'Onboarding') {
+              dateLines += `<div class="card-start">SLIDE Started: ${fmtDate(p.startDate)}</div>`;
+              if (p.firstDay) dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay)}</div>`;
+            } else if (p.stage === 'Induction') {
+              dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay || p.startDate)}</div>`;
+            } else if (p.stage === 'Offboarding') {
+              dateLines += `<div class="card-start">SLIDE Offboarding Started: ${fmtDate(p.startDate)}</div>`;
+              if (p.lastDay) dateLines += `<div class="card-start">Last Day of Work: ${fmtDate(p.lastDay)}</div>`;
+            }
 
             html += `
               <div class="person-card">
@@ -1403,8 +1445,7 @@
                     <div class="card-name">${esc(p.name)}${remoteBadge}</div>
                     <div class="card-jobtitle">${esc(p.jobTitle)}</div>
                     ${coachLine}
-                    <div class="card-start">Started ${fmtDate(p.startDate)}</div>
-                    ${lastDayLine}
+                    ${dateLines}
                   </div>
                   <div class="card-btns">
                     <button class="btn btn-ghost-edit" onclick="openModal('${p.id}')">Edit</button>
