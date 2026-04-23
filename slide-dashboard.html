@@ -821,6 +821,37 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ─── Admin controls ─────────────────────────────────── */
+    .admin-ctrl { display: none !important; }
+    body.admin-mode .admin-ctrl { display: inline-flex !important; }
+
+    .admin-fab {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      background: rgba(60, 50, 40, 0.08);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.32rem 0.65rem;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      cursor: pointer;
+      z-index: 40;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .admin-fab:hover {
+      background: rgba(60, 50, 40, 0.14);
+      color: var(--text-secondary);
+    }
+    body.admin-mode .admin-fab {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: rgba(124, 111, 205, 0.35);
+    }
+
     /* ─── Responsive ──────────────────────────────────── */
     @media (max-width: 700px) {
       main { padding: 1.25rem; }
@@ -841,7 +872,7 @@
         <p>Staff Lifecycle Induction &amp; Development Engine</p>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="openModal()">
+    <button class="btn btn-primary admin-ctrl" onclick="openModal()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
       Add Person
     </button>
@@ -1631,8 +1662,8 @@
                     ${dateLines}
                   </div>
                   <div class="card-btns">
-                    <button class="btn btn-ghost-edit" onclick="openModal('${p.id}')">Edit</button>
-                    <button class="btn btn-ghost-delete" onclick="deletePerson('${p.id}')">Delete</button>
+                    <button class="btn btn-ghost-edit admin-ctrl" onclick="openModal('${p.id}')">Edit</button>
+                    <button class="btn btn-ghost-delete admin-ctrl" onclick="deletePerson('${p.id}')">Delete</button>
                   </div>
                 </div>
                 ${progressHtml}
@@ -1686,6 +1717,21 @@
       if (e.target === this) closeModal();
     });
 
+    // ─── Admin unlock ──────────────────────────────────────
+    function adminUnlock() {
+      if (document.body.classList.contains('admin-mode')) {
+        document.body.classList.remove('admin-mode');
+        return;
+      }
+      const pw = prompt('Admin password:');
+      if (pw === null) return; // cancelled
+      if (pw === 'YGP2026SLIDE') {
+        document.body.classList.add('admin-mode');
+      } else {
+        alert('Incorrect password.');
+      }
+    }
+
     // ─── Keyboard shortcuts ────────────────────────────────
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') closeModal();
@@ -1694,5 +1740,7 @@
     // ─── Init ──────────────────────────────────────────────
     loadStaff();
   </script>
+  <button class="admin-fab" onclick="adminUnlock()">Admin</button>
+
 </body>
 </html>
