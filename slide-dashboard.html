@@ -563,8 +563,8 @@
       box-shadow: 0 6px 20px rgba(60, 50, 40, 0.09), 0 2px 6px rgba(60, 50, 40, 0.05);
     }
 
-    .person-card[draggable="true"] { cursor: grab; }
-    .person-card[draggable="true"]:active { cursor: grabbing; }
+    body.admin-mode .person-card[draggable="true"] { cursor: grab; }
+    body.admin-mode .person-card[draggable="true"]:active { cursor: grabbing; }
 
     .person-card.card-dragging {
       opacity: 0.38;
@@ -1423,6 +1423,10 @@
 
     // ─── Drag-and-drop reordering ──────────────────────────
     function onDragStart(e, id) {
+      if (!document.body.classList.contains('admin-mode')) {
+        e.preventDefault();
+        return;
+      }
       dragSrcId = id;
       e.dataTransfer.effectAllowed = 'move';
       // Delay class so it doesn't affect the drag ghost image
@@ -1647,7 +1651,7 @@
           html += `
               <div class="person-card"
                 id="card-${p.id}"
-                draggable="true"
+                draggable="${document.body.classList.contains('admin-mode')}"
                 ondragstart="onDragStart(event,'${p.id}')"
                 ondragend="onDragEnd(event)"
                 ondragover="onDragOver(event,'${p.id}')"
@@ -1721,12 +1725,14 @@
     function adminUnlock() {
       if (document.body.classList.contains('admin-mode')) {
         document.body.classList.remove('admin-mode');
+        render();
         return;
       }
       const pw = prompt('Admin password:');
       if (pw === null) return; // cancelled
       if (pw === 'YGP2026SLIDE') {
         document.body.classList.add('admin-mode');
+        render();
       } else {
         alert('Incorrect password.');
       }
