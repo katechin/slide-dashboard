@@ -666,6 +666,61 @@
       min-width: 0;
     }
 
+    /* ─── Stage section headers ──────────────────────────── */
+    .stage-section { margin-bottom: 2.5rem; }
+
+    .stage-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-md);
+      border: 1px solid;
+      margin-bottom: 1.25rem;
+    }
+
+    .stage-header-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .stage-header.Onboarding  { background: #C8E8E3; border-color: #AADCD4; }
+    .stage-header.Induction   { background: #EDD9EA; border-color: #DBBDD6; }
+    .stage-header.Offboarding { background: #FBF0BE; border-color: #EEE098; }
+
+    .stage-header.Onboarding  .stage-header-dot { background: #3d8f83; }
+    .stage-header.Induction   .stage-header-dot { background: #9e6898; }
+    .stage-header.Offboarding .stage-header-dot { background: #a07800; }
+
+    .stage-header-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #1C2B3A;
+      flex: 1;
+    }
+
+    .stage-header-count {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #3A4A58;
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 100px;
+      padding: 0.15rem 0.65rem;
+    }
+
+    /* ─── Department label on card ───────────────────────── */
+    .card-dept {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-top: 0.12rem;
+    }
+
     /* ─── Coach + Week meta on card ─────────────────────── */
     .card-coach {
       font-size: 0.67rem;
@@ -774,7 +829,7 @@
 
     <!-- Dashboard -->
     <div class="dash-topbar">
-      <span class="dash-topbar-label">Staff by Department &amp; Stage</span>
+      <span class="dash-topbar-label">Staff by Stage</span>
     </div>
 
     <div id="dashboard"></div>
@@ -1380,70 +1435,64 @@
 
       let html = '';
 
-      for (const dept of DEPT_ORDER) {
-        const deptStaff = staff.filter(p => p.department === dept);
-        if (deptStaff.length === 0) continue;
+      for (const stage of STAGE_ORDER) {
+        const stageStaff = staff
+          .filter(p => p.stage === stage)
+          .sort((a, b) => DEPT_ORDER.indexOf(a.department) - DEPT_ORDER.indexOf(b.department));
+        if (stageStaff.length === 0) continue;
 
-        const iconId = DEPT_ICONS[dept] || 'ico-users';
         html += `
-          <div class="role-section">
-            <div class="role-heading">
-              <div class="role-icon"><svg><use href="#${iconId}" stroke="inherit"/></svg></div>
-              <h2>${esc(dept)}</h2>
-              <span class="role-pill">${deptStaff.length} ${deptStaff.length === 1 ? 'person' : 'people'}</span>
-            </div>`;
+          <div class="stage-section">
+            <div class="stage-header ${stage}">
+              <span class="stage-header-dot"></span>
+              <span class="stage-header-label">${stage}</span>
+              <span class="stage-header-count">${stageStaff.length} ${stageStaff.length === 1 ? 'person' : 'people'}</span>
+            </div>
+            <div class="cards-grid">`;
 
-        for (const stage of STAGE_ORDER) {
-          const group = deptStaff.filter(p => p.stage === stage);
-          if (group.length === 0) continue;
+        for (const p of stageStaff) {
+          const total    = getTaskTotal(p);
+          const pct      = Math.round((p.tasksCompleted / total) * 100);
+          const hasNotes = !!(p.notes && p.notes.trim());
+          const remoteBadge = (REMOTE_DEPTS.includes(p.department) && p.remote)
+            ? `<span class="remote-badge">Remote</span>`
+            : '';
+
+          // Coach line
+          const coachLine = p.coachName
+            ? `<div class="card-coach">Coach: ${esc(p.coachName)}</div>`
+            : '';
+
+          // Week counter (Onboarding + Induction only)
+          let weekHtml = '';
+          if ((p.stage === 'Onboarding' || p.stage === 'Induction') && p.firstDay) {
+            const wi = inductionWeekInfo(p.firstDay);
+            if (wi) {
+              weekHtml = wi.future
+                ? `<div class="card-week-row"><span class="week-badge future">First Day: ${wi.label}</span></div>`
+                : `<div class="card-week-row"><span class="week-badge active">Week ${wi.week} of 26</span></div>`;
+            }
+          }
+
+          // Stage-specific date lines
+          let dateLines = '';
+          if (p.stage === 'Onboarding') {
+            dateLines += `<div class="card-start">SLIDE Started: ${fmtDate(p.startDate)}</div>`;
+            if (p.firstDay) dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay)}</div>`;
+          } else if (p.stage === 'Induction') {
+            dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay || p.startDate)}</div>`;
+          } else if (p.stage === 'Offboarding') {
+            dateLines += `<div class="card-start">SLIDE Offboarding Started: ${fmtDate(p.startDate)}</div>`;
+            if (p.lastDay) dateLines += `<div class="card-start">Last Day of Work: ${fmtDate(p.lastDay)}</div>`;
+          }
 
           html += `
-            <div class="stage-group">
-              <div class="stage-chip ${stage}">${stage}</div>
-              <div class="cards-grid">`;
-
-          for (const p of group) {
-            const total    = getTaskTotal(p);
-            const pct      = Math.round((p.tasksCompleted / total) * 100);
-            const hasNotes = !!(p.notes && p.notes.trim());
-            const remoteBadge = (REMOTE_DEPTS.includes(p.department) && p.remote)
-              ? `<span class="remote-badge">Remote</span>`
-              : '';
-
-            // Coach line
-            const coachLine = p.coachName
-              ? `<div class="card-coach">Coach: ${esc(p.coachName)}</div>`
-              : '';
-
-            // Week counter (Onboarding + Induction only)
-            let weekHtml = '';
-            if ((p.stage === 'Onboarding' || p.stage === 'Induction') && p.firstDay) {
-              const wi = inductionWeekInfo(p.firstDay);
-              if (wi) {
-                weekHtml = wi.future
-                  ? `<div class="card-week-row"><span class="week-badge future">First Day: ${wi.label}</span></div>`
-                  : `<div class="card-week-row"><span class="week-badge active">Week ${wi.week} of 26</span></div>`;
-              }
-            }
-
-            // Stage-specific date lines
-            let dateLines = '';
-            if (p.stage === 'Onboarding') {
-              dateLines += `<div class="card-start">SLIDE Started: ${fmtDate(p.startDate)}</div>`;
-              if (p.firstDay) dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay)}</div>`;
-            } else if (p.stage === 'Induction') {
-              dateLines += `<div class="card-start">First Day of Work: ${fmtDate(p.firstDay || p.startDate)}</div>`;
-            } else if (p.stage === 'Offboarding') {
-              dateLines += `<div class="card-start">SLIDE Offboarding Started: ${fmtDate(p.startDate)}</div>`;
-              if (p.lastDay) dateLines += `<div class="card-start">Last Day of Work: ${fmtDate(p.lastDay)}</div>`;
-            }
-
-            html += `
               <div class="person-card">
                 <div class="card-top">
                   <div>
                     <div class="card-name">${esc(p.name)}${remoteBadge}</div>
                     <div class="card-jobtitle">${esc(p.jobTitle)}</div>
+                    <div class="card-dept">${esc(p.department)}</div>
                     ${coachLine}
                     ${dateLines}
                   </div>
@@ -1488,12 +1537,9 @@
                   </div>
                 </div>
               </div>`;
-          }
-
-          html += `</div></div>`; // close cards-grid, stage-group
         }
 
-        html += `</div>`; // close role-section
+        html += `</div></div>`; // close cards-grid, stage-section
       }
 
       el.innerHTML = html;
