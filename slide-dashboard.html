@@ -849,16 +849,6 @@
         <input type="text" id="f-name" placeholder="e.g. Dr. Jane Smith" autocomplete="off" />
       </div>
       <div class="form-row">
-        <label for="f-coach">Coach</label>
-        <select id="f-coach" onchange="onCoachChange()" disabled>
-          <option value="">Select department first...</option>
-        </select>
-      </div>
-      <div class="form-row" id="coach-other-row" style="display:none">
-        <label for="f-coach-other">Coach Name (specify)</label>
-        <input type="text" id="f-coach-other" placeholder="Enter coach name..." autocomplete="off" />
-      </div>
-      <div class="form-row">
         <label for="f-dept">Department</label>
         <select id="f-dept" onchange="onDeptChange()">
           <option value="">Select a department...</option>
@@ -886,6 +876,16 @@
           </label>
           <span class="toggle-label">Yes, this person works remotely</span>
         </div>
+      </div>
+      <div class="form-row">
+        <label for="f-coach">Coach</label>
+        <select id="f-coach" onchange="onCoachChange()" disabled>
+          <option value="">Select department first...</option>
+        </select>
+      </div>
+      <div class="form-row" id="coach-other-row" style="display:none">
+        <label for="f-coach-other">Coach Name (specify)</label>
+        <input type="text" id="f-coach-other" placeholder="Enter coach name..." autocomplete="off" />
       </div>
       <div class="form-row">
         <label for="f-stage">Stage</label>
