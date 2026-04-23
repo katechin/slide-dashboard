@@ -6,17 +6,17 @@
   <title>SLIDE Dashboard — YourGP</title>
   <style>
     :root {
-      --bg-base: #f0eef8;
+      --bg-base: #F8F6F2;
       --bg-surface: #ffffff;
       --bg-card: #ffffff;
-      --bg-card-alt: #f7f5fb;
-      --border: #dcd6f0;
-      --border-subtle: #e8e4f5;
+      --bg-card-alt: #F4F2ED;
+      --border: #E2DDD4;
+      --border-subtle: #EAE6DE;
       --accent: #7c6fcd;
       --accent-dim: rgba(124, 111, 205, 0.12);
-      --text-primary: #2d2638;
-      --text-secondary: #7a7090;
-      --text-muted: #b5a99a;
+      --text-primary: #2C2A26;
+      --text-secondary: #7A7268;
+      --text-muted: #B0A898;
       --stage-on: #7bc4b8;
       --stage-on-bg: rgba(123, 196, 184, 0.15);
       --stage-on-border: rgba(123, 196, 184, 0.38);
@@ -118,8 +118,13 @@
       display: flex;
       align-items: center;
       gap: 1rem;
-      box-shadow: 0 2px 14px rgba(120, 100, 180, 0.08);
+      box-shadow: 0 2px 12px rgba(60, 50, 40, 0.06), 0 1px 3px rgba(60, 50, 40, 0.04);
     }
+
+    .stat-card.total       { background: #E8E4F6; border-color: #D2CCE8; }
+    .stat-card.onboarding  { background: #C8E8E3; border-color: #AADCD4; }
+    .stat-card.induction   { background: #EDD9EA; border-color: #DBBDD6; }
+    .stat-card.offboarding { background: #FBF0BE; border-color: #EEE098; }
 
     .stat-dot {
       width: 44px;
@@ -133,15 +138,15 @@
 
     .stat-dot svg { width: 20px; height: 20px; }
 
-    .stat-dot.total { background: rgba(124, 111, 205, 0.15); }
-    .stat-dot.onboarding { background: rgba(123, 196, 184, 0.2); }
-    .stat-dot.induction { background: rgba(196, 154, 189, 0.2); }
-    .stat-dot.offboarding { background: rgba(245, 200, 66, 0.22); }
+    .stat-dot.total       { background: rgba(255, 255, 255, 0.52); }
+    .stat-dot.onboarding  { background: rgba(255, 255, 255, 0.52); }
+    .stat-dot.induction   { background: rgba(255, 255, 255, 0.52); }
+    .stat-dot.offboarding { background: rgba(255, 255, 255, 0.52); }
 
-    .stat-dot.total svg { stroke: var(--accent); }
-    .stat-dot.onboarding svg { stroke: #4a9b8e; }
-    .stat-dot.induction svg { stroke: #9e6898; }
-    .stat-dot.offboarding svg { stroke: #b89000; }
+    .stat-dot.total svg       { stroke: #1C2B3A; }
+    .stat-dot.onboarding svg  { stroke: #1C2B3A; }
+    .stat-dot.induction svg   { stroke: #1C2B3A; }
+    .stat-dot.offboarding svg { stroke: #1C2B3A; }
 
     .stat-body { line-height: 1.2; }
 
@@ -151,10 +156,10 @@
       letter-spacing: -0.5px;
     }
 
-    .stat-card.total .stat-number { color: var(--accent); }
-    .stat-card.onboarding .stat-number { color: #4a9b8e; }
-    .stat-card.induction .stat-number { color: #9e6898; }
-    .stat-card.offboarding .stat-number { color: #b89000; }
+    .stat-card.total .stat-number,
+    .stat-card.onboarding .stat-number,
+    .stat-card.induction .stat-number,
+    .stat-card.offboarding .stat-number { color: #1C2B3A; }
 
     .stat-label {
       font-size: 0.72rem;
@@ -163,6 +168,11 @@
       letter-spacing: 0.6px;
       font-weight: 500;
     }
+
+    .stat-card.total .stat-label,
+    .stat-card.onboarding .stat-label,
+    .stat-card.induction .stat-label,
+    .stat-card.offboarding .stat-label { color: #3A4A58; }
 
     /* ─── Dashboard top bar ───────────────────────────── */
     .dash-topbar {
@@ -233,7 +243,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(180, 168, 210, 0.45);
+      background: rgba(50, 44, 36, 0.35);
       backdrop-filter: blur(8px);
       z-index: 100;
       align-items: center;
@@ -248,7 +258,7 @@
       width: 100%;
       max-width: 440px;
       padding: 1.75rem;
-      box-shadow: 0 20px 60px rgba(100, 80, 160, 0.18);
+      box-shadow: 0 20px 60px rgba(60, 50, 40, 0.14), 0 4px 16px rgba(60, 50, 40, 0.08);
       animation: slideUp 0.18s ease;
     }
 
@@ -544,13 +554,13 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       padding: 1.1rem 1.2rem;
-      box-shadow: 0 2px 10px rgba(120, 100, 180, 0.07);
+      box-shadow: 0 2px 8px rgba(60, 50, 40, 0.06), 0 1px 2px rgba(60, 50, 40, 0.04);
       transition: border-color 0.15s, box-shadow 0.15s;
     }
 
     .person-card:hover {
       border-color: var(--border);
-      box-shadow: 0 4px 18px rgba(120, 100, 180, 0.12);
+      box-shadow: 0 6px 20px rgba(60, 50, 40, 0.09), 0 2px 6px rgba(60, 50, 40, 0.05);
     }
 
     .card-top {
@@ -643,7 +653,7 @@
 
     .bar-track {
       height: 7px;
-      background: rgba(0, 0, 0, 0.07);
+      background: rgba(60, 50, 40, 0.08);
       border-radius: 100px;
       overflow: hidden;
     }
@@ -672,6 +682,26 @@
     }
 
     .empty-state p { font-size: 0.82rem; }
+
+    /* ─── Loading state ──────────────────────────────── */
+    .loading-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    .loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 0.75rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ─── Responsive ──────────────────────────────────── */
     @media (max-width: 700px) {
@@ -821,7 +851,13 @@
     </symbol>
   </svg>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
+    // ─── Supabase client ───────────────────────────────────
+    const SUPABASE_URL = 'https://ioglucqixaviphpvampq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvZ2x1Y3FpeGF2aXBocHZhbXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzIxMDIsImV4cCI6MjA5MTI0ODEwMn0.Bto4yf6w2FN_is61aGfSoEHY0fouPngE5CVSC9NtFJw';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     // ─── Department → Job Title mapping ───────────────────
     const DEPT_JOB_TITLES = {
       'Reception':             ['Medical Receptionist'],
@@ -847,39 +883,43 @@
       'PST':                   'ico-pso'
     };
 
-    // ─── Migrate old data format (role → department + jobTitle) ─
-    const OLD_ROLE_MAP = {
-      'Reception':               { department: 'Reception',             jobTitle: 'Medical Receptionist' },
-      'Site Manager':            { department: 'Business',              jobTitle: 'Site Manager' },
-      'Nurse':                   { department: 'Nursing',               jobTitle: 'Registered Nurse' },
-      'GP/Registrar':            { department: 'GP',                    jobTitle: 'GP' },
-      'JMO Doctor':              { department: 'GP',                    jobTitle: 'JMO Doctor' },
-      'Finance Team':            { department: 'Finance',               jobTitle: 'Finance Manager' },
-      'Projects & Innovation':   { department: 'Projects & Innovation', jobTitle: 'Head of Projects & Innovation' },
-      'Practice Support Officer':{ department: 'PST',                   jobTitle: 'Practice Support Officer' }
-    };
-
     // ─── State ─────────────────────────────────────────────
-    let staff  = JSON.parse(localStorage.getItem('slide_staff') || '[]');
+    let staff  = [];
     let editId = null;
 
-    // Migrate any records using the old single 'role' field
-    staff = staff.map(p => {
-      if (!p.department && p.role) {
-        const m = OLD_ROLE_MAP[p.role] || { department: p.role, jobTitle: p.role };
-        const { role, ...rest } = p;
-        return { ...rest, department: m.department, jobTitle: m.jobTitle };
-      }
-      return p;
-    });
+    // ─── Row mapping ───────────────────────────────────────
+    function toRow(p) {
+      return {
+        id:              p.id,
+        staff_name:      p.name,
+        department:      p.department,
+        job_title:       p.jobTitle,
+        stage:           p.stage,
+        tasks_completed: p.tasksCompleted,
+        total_tasks:     getTaskTotal(p),
+        start_date:      p.startDate,
+        notes:           p.notes || '',
+        is_remote:       !!p.remote,
+        saved_at:        new Date().toISOString()
+      };
+    }
 
-    // ─── Persistence ───────────────────────────────────────
-    function persist() {
-      localStorage.setItem('slide_staff', JSON.stringify(staff));
+    function fromRow(row) {
+      return {
+        id:             row.id,
+        name:           row.staff_name,
+        department:     row.department,
+        jobTitle:       row.job_title,
+        stage:          row.stage,
+        tasksCompleted: row.tasks_completed || 0,
+        startDate:      row.start_date,
+        notes:          row.notes || '',
+        remote:         !!row.is_remote
+      };
     }
 
     function uid() {
-      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      return crypto.randomUUID();
     }
 
     // ─── Task total logic ──────────────────────────────────
@@ -976,7 +1016,7 @@
     }
 
     // ─── Save / Delete ─────────────────────────────────────
-    function savePerson() {
+    async function savePerson() {
       const name       = document.getElementById('f-name').value.trim();
       const department = document.getElementById('f-dept').value;
       const jobTitle   = document.getElementById('f-title').value;
@@ -991,31 +1031,51 @@
         return;
       }
 
+      const saveBtn = document.querySelector('.modal-footer .btn-primary');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+
+      let person;
       if (editId) {
         const i = staff.findIndex(p => p.id === editId);
         if (i !== -1) {
-          const updated = { ...staff[i], name, department, jobTitle, stage, startDate, remote };
-          updated.tasksCompleted = Math.min(updated.tasksCompleted, getTaskTotal(updated));
-          staff[i] = updated;
+          person = { ...staff[i], name, department, jobTitle, stage, startDate, remote };
+          person.tasksCompleted = Math.min(person.tasksCompleted, getTaskTotal(person));
+          staff[i] = person;
         }
       } else {
-        staff.push({
-          id: uid(), name, department, jobTitle, stage, startDate,
-          remote, tasksCompleted: 0, notes: ''
-        });
+        person = { id: uid(), name, department, jobTitle, stage, startDate, remote, tasksCompleted: 0, notes: '' };
+        staff.push(person);
       }
 
-      persist();
+      const { error } = await db.from('slide_staff').upsert(toRow(person));
+      if (error) {
+        alert('Error saving: ' + error.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        return;
+      }
+
       closeModal();
       render();
     }
 
-    function deletePerson(id) {
+    async function deletePerson(id) {
       const person = staff.find(p => p.id === id);
       if (!confirm(`Remove ${person ? person.name : 'this person'} from the dashboard?`)) return;
+
+      const { error } = await db.from('slide_staff').delete().eq('id', id);
+      if (error) { alert('Error deleting: ' + error.message); return; }
+
       staff = staff.filter(p => p.id !== id);
-      persist();
       render();
+    }
+
+    // ─── Debounce helper ───────────────────────────────────
+    const _debounceTimers = {};
+    function debounce(key, fn, delay = 700) {
+      clearTimeout(_debounceTimers[key]);
+      _debounceTimers[key] = setTimeout(fn, delay);
     }
 
     // ─── Inline task update (no full re-render) ────────────
@@ -1025,13 +1085,20 @@
       const max = getTaskTotal(p);
       const val = Math.min(max, Math.max(0, parseInt(raw) || 0));
       p.tasksCompleted = val;
-      persist();
 
       const pct   = Math.round((val / max) * 100);
       const barEl = document.getElementById('bar-' + id);
       const pctEl = document.getElementById('pct-' + id);
       if (barEl) barEl.style.width = pct + '%';
       if (pctEl) pctEl.textContent = pct + '%';
+
+      debounce('tasks-' + id, async () => {
+        await db.from('slide_staff').update({
+          tasks_completed: val,
+          total_tasks:     max,
+          saved_at:        new Date().toISOString()
+        }).eq('id', id);
+      });
     }
 
     // ─── Notes ─────────────────────────────────────────────
@@ -1046,10 +1113,15 @@
       const p = staff.find(x => x.id === id);
       if (!p) return;
       p.notes = value;
-      persist();
-      // Update dot indicator without re-render
       const dot = document.getElementById('notes-dot-' + id);
       if (dot) dot.style.display = value.trim() ? '' : 'none';
+
+      debounce('notes-' + id, async () => {
+        await db.from('slide_staff').update({
+          notes:    value,
+          saved_at: new Date().toISOString()
+        }).eq('id', id);
+      });
     }
 
     // ─── Helpers ───────────────────────────────────────────
@@ -1214,6 +1286,21 @@
       renderDashboard();
     }
 
+    // ─── Load from Supabase ────────────────────────────────
+    async function loadStaff() {
+      document.getElementById('dashboard').innerHTML =
+        '<div class="loading-state"><div class="loading-spinner"></div><p>Loading staff data…</p></div>';
+
+      const { data, error } = await db.from('slide_staff').select('*').order('saved_at', { ascending: true });
+      if (error) {
+        document.getElementById('dashboard').innerHTML =
+          `<div class="empty-state"><h3>Could not load data</h3><p>${esc(error.message)}</p></div>`;
+        return;
+      }
+      staff = (data || []).map(fromRow);
+      render();
+    }
+
     // ─── Close overlay on backdrop click ───────────────────
     document.getElementById('overlay').addEventListener('click', function(e) {
       if (e.target === this) closeModal();
@@ -1225,7 +1312,7 @@
     });
 
     // ─── Init ──────────────────────────────────────────────
-    render();
+    loadStaff();
   </script>
 </body>
 </html>
