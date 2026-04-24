@@ -1182,6 +1182,15 @@
       return 0;
     }
 
+    // Primary: sort_order ascending (respects manual drag order).
+    // Tiebreaker: newest first (applies when sort_order values are equal,
+    // i.e. no drag has been done yet — new cards all start at 0).
+    function sortForDisplay(a, b) {
+      const orderDiff = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      return sortNewestFirst(a, b);
+    }
+
     function uid() {
       if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
@@ -1425,8 +1434,7 @@
           staff[i] = person;
         } else {
           isNew = true;
-          const sortOrder = staff.filter(p => p.stage === stage).length;
-          person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder };
+          person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder: 0 };
           staff.push(person);
         }
 
@@ -1561,7 +1569,7 @@
       // Reorder within stage
       const items = staff
         .filter(p => p.stage === src.stage)
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        .sort(sortForDisplay);
 
       const srcIdx = items.findIndex(p => p.id === dragSrcId);
       const tgtIdx = items.findIndex(p => p.id === targetId);
@@ -1676,11 +1684,11 @@
       for (const stage of STAGE_ORDER) {
         let stageStaff = staff
           .filter(p => p.stage === stage)
-          .sort(sortNewestFirst);
+          .sort(sortForDisplay);
         if (stage === 'Induction') {
           const autoTriggered = staff
             .filter(p => p.stage === 'Onboarding' && inductionStarted(p))
-            .sort(sortNewestFirst);
+            .sort(sortForDisplay);
           stageStaff = [...autoTriggered, ...stageStaff];
         }
         if (stageStaff.length === 0) continue;
