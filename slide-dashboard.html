@@ -618,6 +618,26 @@
       min-height: 90px;
     }
 
+    .drag-toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d7a42;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 0.4rem 1.1rem;
+      border-radius: 999px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+    .drag-toast.show { opacity: 1; }
+
     .card-top {
       display: flex;
       align-items: flex-start;
@@ -1177,6 +1197,7 @@
     let dragOverEl      = null;
     let dragInsertAfter = false;
     let _placeholder    = null;
+    let _toastTimer     = null;
 
     // ─── Row mapping ───────────────────────────────────────
     function toRow(p) {
@@ -1194,7 +1215,7 @@
         last_day:        p.lastDay    || null,
         notes:           p.notes      || '',
         is_remote:       !!p.remote,
-        sort_order:      p.sortOrder ?? 0,
+        sort_order:      p.sortOrder != null ? p.sortOrder : null,
         saved_at:        new Date().toISOString()
       };
     }
@@ -1213,7 +1234,7 @@
         lastDay:        row.last_day    || '',
         notes:          row.notes       || '',
         remote:         !!row.is_remote,
-        sortOrder:      row.sort_order  ?? 0,
+        sortOrder:      row.sort_order  != null ? row.sort_order : null,
         createdAt:      row.created_at  || null
       };
     }
@@ -1227,12 +1248,14 @@
       return 0;
     }
 
-    // Primary: sort_order ascending (respects manual drag order).
-    // Tiebreaker: newest first (applies when sort_order values are equal,
-    // i.e. no drag has been done yet — new cards all start at 0).
+    // Primary: sort_order ascending for cards that have been drag-ordered (non-null).
+    // Null sort_order = never dragged → sorted newest-first, always after ordered cards.
     function sortForDisplay(a, b) {
-      const orderDiff = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-      if (orderDiff !== 0) return orderDiff;
+      const oa = a.sortOrder;
+      const ob = b.sortOrder;
+      if (oa != null && ob != null) return oa - ob;
+      if (oa != null) return -1;
+      if (ob != null) return  1;
       return sortNewestFirst(a, b);
     }
 
@@ -1479,7 +1502,7 @@
           staff[i] = person;
         } else {
           isNew = true;
-          person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder: 0 };
+          person = { id: uid(), name, coachName, department, jobTitle, stage, startDate, firstDay, lastDay, remote, tasksCompleted: 0, notes: '', sortOrder: null };
           staff.push(person);
         }
 
@@ -1647,16 +1670,18 @@
       const tgtStage = el.dataset.renderedStage;
       if (!src || !tgt || !srcStage || srcStage !== tgtStage) return;
 
-      // For Onboarding, all p.stage==='Onboarding' cards are in the same group.
-      // For Induction, include auto-triggered Onboarding cards via visualSection.
-      const items = (srcStage === 'Onboarding')
-        ? staff.filter(p => p.stage === 'Onboarding').sort(sortForDisplay)
-        : staff.filter(p => visualSection(p) === srcStage).sort(sortForDisplay);
+      // Only reorder cards that belong to this section (p.stage === srcStage).
+      // Auto-triggered Onboarding cards in the Induction view maintain their
+      // Onboarding sort order and are not draggable, so they never reach here as src.
+      // Guard below handles the case where one is the drop target.
+      const items = staff.filter(p => p.stage === srcStage).sort(sortForDisplay);
 
-      const srcIdx = items.findIndex(p => p.id === dragSrcId);
+      const srcIdx    = items.findIndex(p => p.id === dragSrcId);
+      const newTgtIdx = items.findIndex(p => p.id === id);
+      if (srcIdx === -1 || newTgtIdx === -1) return;
+
       items.splice(srcIdx, 1);
-      const newTgtIdx  = items.findIndex(p => p.id === id);
-      const insertIdx  = insertAfter ? newTgtIdx + 1 : newTgtIdx;
+      const insertIdx = insertAfter ? newTgtIdx + 1 : newTgtIdx;
       items.splice(insertIdx, 0, src);
       items.forEach((p, i) => { p.sortOrder = i; });
 
@@ -1666,12 +1691,33 @@
         el.parentNode.insertBefore(srcEl, insertAfter ? el.nextSibling : el);
       }
 
-      await Promise.all(items.map(p =>
-        db.from('slide_staff').update({
-          sort_order: p.sortOrder,
-          saved_at:   new Date().toISOString()
-        }).eq('id', p.id)
-      ));
+      try {
+        const results = await Promise.all(items.map(p =>
+          db.from('slide_staff').update({
+            sort_order: p.sortOrder,
+            saved_at:   new Date().toISOString()
+          }).eq('id', p.id)
+        ));
+        const failed = results.some(r => r.error);
+        if (!failed) showToast('Card order saved ✓');
+      } catch (err) {
+        // Sort order is updated in memory; DB save failed silently.
+      }
+    }
+
+    // ─── Toast ─────────────────────────────────────────────
+    function showToast(msg) {
+      let el = document.getElementById('drag-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'drag-toast';
+        el.className = 'drag-toast';
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2000);
     }
 
     // ─── Helpers ───────────────────────────────────────────
@@ -1872,7 +1918,7 @@
                 id="card-${p.id}"
                 data-person-id="${p.id}"
                 data-rendered-stage="${stage}"
-                draggable="${document.body.classList.contains('admin-mode')}"
+                draggable="${!isAutoTriggered && document.body.classList.contains('admin-mode')}"
                 ondragstart="onDragStart(event,this,'${p.id}')"
                 ondragend="onDragEnd(event)"
                 ondragover="onDragOver(event,this,'${p.id}')"
@@ -1926,7 +1972,7 @@
       document.getElementById('dashboard').innerHTML =
         '<div class="loading-state"><div class="loading-spinner"></div><p>Loading staff data…</p></div>';
 
-      const { data, error } = await db.from('slide_staff').select('*').order('sort_order', { ascending: true }).order('saved_at', { ascending: true });
+      const { data, error } = await db.from('slide_staff').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
       if (error) {
         document.getElementById('dashboard').innerHTML =
           `<div class="empty-state"><h3>Could not load data</h3><p>${esc(error.message)}</p></div>`;
