@@ -107,7 +107,30 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 1rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .dashboard-legend {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin: 0 0 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      background: var(--danger);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 900;
+      flex-shrink: 0;
     }
 
     .stat-card {
@@ -951,6 +974,9 @@
 
     <!-- Summary -->
     <div class="summary-strip" id="summary"></div>
+
+    <!-- Legend -->
+    <p class="dashboard-legend"><span class="legend-badge">!</span> Induction started — onboarding tasks still incomplete. Coach action required.</p>
 
     <!-- Dashboard -->
     <div class="dash-topbar">
