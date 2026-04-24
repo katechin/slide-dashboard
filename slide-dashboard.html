@@ -1485,9 +1485,6 @@
 
         const { error } = await db.from('slide_staff').upsert(toRow(person));
         if (error) throw new Error(error.message);
-
-        closeModal();
-        render();
       } catch (err) {
         // Roll back local state so the dashboard stays consistent
         if (isNew && person) {
@@ -1495,9 +1492,14 @@
         } else if (prevStaff) {
           staff = prevStaff;
         }
-        resetBtn();
         alert('Save failed — ' + (err.message || 'please try again.'));
+        return;
+      } finally {
+        resetBtn();
       }
+
+      closeModal();
+      render();
     }
 
     async function deletePerson(id) {
