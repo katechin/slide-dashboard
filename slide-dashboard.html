@@ -1172,10 +1172,11 @@
     // ─── State ─────────────────────────────────────────────
     let staff        = [];
     let editId       = null;
-    let dragSrcId    = null;
-    let dragSrcEl    = null;
-    let dragOverEl   = null;
-    let _placeholder = null;
+    let dragSrcId       = null;
+    let dragSrcEl       = null;
+    let dragOverEl      = null;
+    let dragInsertAfter = false;
+    let _placeholder    = null;
 
     // ─── Row mapping ───────────────────────────────────────
     function toRow(p) {
@@ -1604,49 +1605,63 @@
       document.querySelectorAll('.card-dragging, .card-drag-over')
         .forEach(c => c.classList.remove('card-dragging', 'card-drag-over'));
       _removePlaceholder();
-      dragSrcId  = null;
-      dragSrcEl  = null;
-      dragOverEl = null;
+      dragSrcId       = null;
+      dragSrcEl       = null;
+      dragOverEl      = null;
+      dragInsertAfter = false;
     }
 
     function onDragOver(e, el, id) {
       if (id === dragSrcId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      if (el === dragOverEl) return; // already showing for this target
-      dragOverEl = el;
+      const rect  = el.getBoundingClientRect();
+      const after = e.clientX > rect.left + rect.width / 2;
+      if (el === dragOverEl && after === dragInsertAfter) return;
+      dragOverEl      = el;
+      dragInsertAfter = after;
       document.querySelectorAll('.card-drag-over').forEach(c => c.classList.remove('card-drag-over'));
       _removePlaceholder();
-      el.parentNode.insertBefore(_getPlaceholder(), el);
+      el.parentNode.insertBefore(_getPlaceholder(), after ? el.nextSibling : el);
     }
 
     async function onDrop(e, el, id) {
       e.preventDefault();
       document.querySelectorAll('.card-drag-over').forEach(c => c.classList.remove('card-drag-over'));
       _removePlaceholder();
-      const srcEl = dragSrcEl;
-      dragOverEl = null;
+      const srcEl      = dragSrcEl;
+      const insertAfter = dragInsertAfter;
+      dragOverEl       = null;
+      dragInsertAfter  = false;
       if (!dragSrcId || dragSrcId === id) return;
 
       const src = staff.find(p => p.id === dragSrcId);
       const tgt = staff.find(p => p.id === id);
-      if (!src || !tgt || visualSection(src) !== visualSection(tgt)) return;
 
-      const section = visualSection(src);
-      const items = staff
-        .filter(p => visualSection(p) === section)
-        .sort(sortForDisplay);
+      // Use the rendered section (not visualSection) so that Onboarding cards
+      // whose induction has started (visualSection = 'Induction') can still be
+      // dragged against cards like Lisa whose induction hasn't started yet.
+      const srcStage = srcEl ? srcEl.dataset.renderedStage : null;
+      const tgtStage = el.dataset.renderedStage;
+      if (!src || !tgt || !srcStage || srcStage !== tgtStage) return;
+
+      // For Onboarding, all p.stage==='Onboarding' cards are in the same group.
+      // For Induction, include auto-triggered Onboarding cards via visualSection.
+      const items = (srcStage === 'Onboarding')
+        ? staff.filter(p => p.stage === 'Onboarding').sort(sortForDisplay)
+        : staff.filter(p => visualSection(p) === srcStage).sort(sortForDisplay);
 
       const srcIdx = items.findIndex(p => p.id === dragSrcId);
       items.splice(srcIdx, 1);
-      const newTgtIdx = items.findIndex(p => p.id === id);
-      items.splice(newTgtIdx, 0, src);
+      const newTgtIdx  = items.findIndex(p => p.id === id);
+      const insertIdx  = insertAfter ? newTgtIdx + 1 : newTgtIdx;
+      items.splice(insertIdx, 0, src);
       items.forEach((p, i) => { p.sortOrder = i; });
 
       // Move the source card directly in the DOM — avoids render() reverting
       // the visual order before the browser has committed the drop.
       if (srcEl && el.parentNode && srcEl !== el) {
-        el.parentNode.insertBefore(srcEl, el);
+        el.parentNode.insertBefore(srcEl, insertAfter ? el.nextSibling : el);
       }
 
       await Promise.all(items.map(p =>
@@ -1854,6 +1869,7 @@
               <div class="person-card"
                 id="card-${p.id}"
                 data-person-id="${p.id}"
+                data-rendered-stage="${stage}"
                 draggable="${document.body.classList.contains('admin-mode')}"
                 ondragstart="onDragStart(event,this,'${p.id}')"
                 ondragend="onDragEnd(event)"
