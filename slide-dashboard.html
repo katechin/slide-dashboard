@@ -611,6 +611,14 @@
       box-shadow: -3px 0 0 var(--accent), 0 6px 20px rgba(60, 50, 40, 0.09);
     }
 
+    .drag-placeholder {
+      border: 2px dashed var(--accent);
+      border-radius: var(--radius-lg);
+      background: var(--accent-dim);
+      min-height: 90px;
+      pointer-events: none;
+    }
+
     .card-top {
       display: flex;
       align-items: flex-start;
@@ -1163,9 +1171,11 @@
     };
 
     // ─── State ─────────────────────────────────────────────
-    let staff     = [];
-    let editId    = null;
-    let dragSrcId = null;
+    let staff       = [];
+    let editId      = null;
+    let dragSrcId   = null;
+    let dragOverEl  = null;
+    let _placeholder = null;
 
     // ─── Row mapping ───────────────────────────────────────
     function toRow(p) {
@@ -1554,7 +1564,22 @@
     }
 
     // ─── Drag-and-drop reordering ──────────────────────────
-    function onDragStart(e, id) {
+    function _getPlaceholder() {
+      if (!_placeholder) {
+        _placeholder = document.createElement('div');
+        _placeholder.className = 'drag-placeholder';
+        _placeholder.setAttribute('aria-hidden', 'true');
+      }
+      return _placeholder;
+    }
+
+    function _removePlaceholder() {
+      if (_placeholder && _placeholder.parentNode) {
+        _placeholder.parentNode.removeChild(_placeholder);
+      }
+    }
+
+    function onDragStart(e, el, id) {
       if (!document.body.classList.contains('admin-mode')) {
         e.preventDefault();
         return;
@@ -1562,59 +1587,57 @@
       dragSrcId = id;
       e.dataTransfer.effectAllowed = 'move';
       // Delay class so it doesn't affect the drag ghost image
-      setTimeout(() => {
-        const el = document.getElementById('card-' + id);
-        if (el) el.classList.add('card-dragging');
-      }, 0);
+      setTimeout(() => { el.classList.add('card-dragging'); }, 0);
     }
 
     function onDragEnd(e) {
       document.querySelectorAll('.card-dragging, .card-drag-over')
-        .forEach(el => el.classList.remove('card-dragging', 'card-drag-over'));
-      dragSrcId = null;
+        .forEach(c => c.classList.remove('card-dragging', 'card-drag-over'));
+      _removePlaceholder();
+      dragSrcId  = null;
+      dragOverEl = null;
     }
 
-    function onDragOver(e, id) {
+    function onDragOver(e, el, id) {
       if (id === dragSrcId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      document.querySelectorAll('.card-drag-over')
-        .forEach(el => el.classList.remove('card-drag-over'));
-      const el = document.getElementById('card-' + id);
-      if (el) el.classList.add('card-drag-over');
+      if (el === dragOverEl) return; // already showing for this target
+      dragOverEl = el;
+      document.querySelectorAll('.card-drag-over').forEach(c => c.classList.remove('card-drag-over'));
+      _removePlaceholder();
+      el.parentNode.insertBefore(_getPlaceholder(), el);
     }
 
-    function onDragLeave(e) {
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        e.currentTarget.classList.remove('card-drag-over');
-      }
+    function onDragLeave(e, el) {
+      // Placeholder handles all visual feedback; nothing needed here.
     }
 
-    async function onDrop(e, targetId) {
+    async function onDrop(e, el, id) {
       e.preventDefault();
-      document.querySelectorAll('.card-drag-over')
-        .forEach(el => el.classList.remove('card-drag-over'));
-      if (!dragSrcId || dragSrcId === targetId) return;
+      document.querySelectorAll('.card-drag-over').forEach(c => c.classList.remove('card-drag-over'));
+      _removePlaceholder();
+      dragOverEl = null;
+      if (!dragSrcId || dragSrcId === id) return;
 
       const src = staff.find(p => p.id === dragSrcId);
-      const tgt = staff.find(p => p.id === targetId);
+      const tgt = staff.find(p => p.id === id);
       if (!src || !tgt || visualSection(src) !== visualSection(tgt)) return;
 
-      // Reorder within the visual section (may include mixed p.stage values)
       const section = visualSection(src);
       const items = staff
         .filter(p => visualSection(p) === section)
         .sort(sortForDisplay);
 
       const srcIdx = items.findIndex(p => p.id === dragSrcId);
-      const tgtIdx = items.findIndex(p => p.id === targetId);
       items.splice(srcIdx, 1);
-      items.splice(tgtIdx, 0, src);
+      // Recalculate tgt index after removal so insert is always before target
+      const newTgtIdx = items.findIndex(p => p.id === id);
+      items.splice(newTgtIdx, 0, src);
       items.forEach((p, i) => { p.sortOrder = i; });
 
       render();
 
-      // Persist new order to Supabase
       await Promise.all(items.map(p =>
         db.from('slide_staff').update({
           sort_order: p.sortOrder,
@@ -1729,9 +1752,9 @@
           .sort(sortForDisplay);
         if (stage === 'Induction') {
           const autoTriggered = staff
-            .filter(p => p.stage === 'Onboarding' && inductionStarted(p))
-            .sort(sortForDisplay);
-          stageStaff = [...autoTriggered, ...stageStaff];
+            .filter(p => p.stage === 'Onboarding' && inductionStarted(p));
+          // Merge both types into one list and sort together so drag order is respected
+          stageStaff = [...autoTriggered, ...stageStaff].sort(sortForDisplay);
         }
         if (stageStaff.length === 0) continue;
 
@@ -1820,11 +1843,11 @@
               <div class="person-card"
                 id="card-${p.id}"
                 draggable="${document.body.classList.contains('admin-mode')}"
-                ondragstart="onDragStart(event,'${p.id}')"
+                ondragstart="onDragStart(event,this,'${p.id}')"
                 ondragend="onDragEnd(event)"
-                ondragover="onDragOver(event,'${p.id}')"
-                ondragleave="onDragLeave(event)"
-                ondrop="onDrop(event,'${p.id}')">
+                ondragover="onDragOver(event,this,'${p.id}')"
+                ondragleave="onDragLeave(event,this)"
+                ondrop="onDrop(event,this,'${p.id}')">
                 <div class="card-top">
                   <div>
                     <div class="card-name">${esc(p.name)}${remoteBadge}</div>
