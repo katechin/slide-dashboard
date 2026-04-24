@@ -1171,10 +1171,11 @@
     };
 
     // ─── State ─────────────────────────────────────────────
-    let staff       = [];
-    let editId      = null;
-    let dragSrcId   = null;
-    let dragOverEl  = null;
+    let staff        = [];
+    let editId       = null;
+    let dragSrcId    = null;
+    let dragSrcEl    = null;
+    let dragOverEl   = null;
     let _placeholder = null;
 
     // ─── Row mapping ───────────────────────────────────────
@@ -1585,6 +1586,7 @@
         return;
       }
       dragSrcId = id;
+      dragSrcEl = el;
       e.dataTransfer.effectAllowed = 'move';
       // Delay class so it doesn't affect the drag ghost image
       setTimeout(() => { el.classList.add('card-dragging'); }, 0);
@@ -1595,6 +1597,7 @@
         .forEach(c => c.classList.remove('card-dragging', 'card-drag-over'));
       _removePlaceholder();
       dragSrcId  = null;
+      dragSrcEl  = null;
       dragOverEl = null;
     }
 
@@ -1617,6 +1620,7 @@
       e.preventDefault();
       document.querySelectorAll('.card-drag-over').forEach(c => c.classList.remove('card-drag-over'));
       _removePlaceholder();
+      const srcEl = dragSrcEl;
       dragOverEl = null;
       if (!dragSrcId || dragSrcId === id) return;
 
@@ -1631,12 +1635,15 @@
 
       const srcIdx = items.findIndex(p => p.id === dragSrcId);
       items.splice(srcIdx, 1);
-      // Recalculate tgt index after removal so insert is always before target
       const newTgtIdx = items.findIndex(p => p.id === id);
       items.splice(newTgtIdx, 0, src);
       items.forEach((p, i) => { p.sortOrder = i; });
 
-      render();
+      // Move the source card directly in the DOM — avoids render() reverting
+      // the visual order before the browser has committed the drop.
+      if (srcEl && el.parentNode && srcEl !== el) {
+        el.parentNode.insertBefore(srcEl, el);
+      }
 
       await Promise.all(items.map(p =>
         db.from('slide_staff').update({
