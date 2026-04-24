@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SLIDE Dashboard — YourGP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-base: #F8F6F2;
@@ -66,14 +69,22 @@
     }
 
     .brand-mark {
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.8rem;
+      font-family: 'Cinzel', serif;
+      color: #5a4a42;
+      line-height: 1;
+      display: flex;
+      align-items: baseline;
+      gap: 0.05em;
+    }
+
+    .brand-mark .logo-your {
+      font-weight: 400;
+      font-size: 1rem;
+    }
+
+    .brand-mark .logo-gp {
       font-weight: 700;
-      letter-spacing: 0.6px;
-      padding: 0.3rem 0.65rem;
-      border-radius: var(--radius-sm);
-      text-transform: uppercase;
+      font-size: 1.65rem;
     }
 
     .brand-divider {
@@ -956,7 +967,7 @@
   <!-- ─── Header ──────────────────────────────────────── -->
   <header>
     <div class="header-brand">
-      <span class="brand-mark">YourGP</span>
+      <span class="brand-mark"><span class="logo-your">YOUR</span><span class="logo-gp">GP</span></span>
       <div class="brand-divider"></div>
       <div class="brand-titles">
         <h1>SLIDE Dashboard</h1>
