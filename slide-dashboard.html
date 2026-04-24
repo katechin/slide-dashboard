@@ -1564,11 +1564,12 @@
 
       const src = staff.find(p => p.id === dragSrcId);
       const tgt = staff.find(p => p.id === targetId);
-      if (!src || !tgt || src.stage !== tgt.stage) return;
+      if (!src || !tgt || visualSection(src) !== visualSection(tgt)) return;
 
-      // Reorder within stage
+      // Reorder within the visual section (may include mixed p.stage values)
+      const section = visualSection(src);
       const items = staff
-        .filter(p => p.stage === src.stage)
+        .filter(p => visualSection(p) === section)
         .sort(sortForDisplay);
 
       const srcIdx = items.findIndex(p => p.id === dragSrcId);
@@ -1627,6 +1628,13 @@
       today.setHours(0, 0, 0, 0);
       start.setHours(0, 0, 0, 0);
       return today >= start;
+    }
+
+    // Returns the section a card visually appears in, matching the render logic.
+    // Auto-triggered Onboarding cards (firstDay arrived) show in the Induction section.
+    function visualSection(p) {
+      if (p.stage === 'Onboarding' && inductionStarted(p)) return 'Induction';
+      return p.stage;
     }
 
     // ─── Render Summary ────────────────────────────────────
