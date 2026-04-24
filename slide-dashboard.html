@@ -616,7 +616,6 @@
       border-radius: var(--radius-lg);
       background: var(--accent-dim);
       min-height: 90px;
-      pointer-events: none;
     }
 
     .card-top {
@@ -1570,6 +1569,15 @@
         _placeholder = document.createElement('div');
         _placeholder.className = 'drag-placeholder';
         _placeholder.setAttribute('aria-hidden', 'true');
+        _placeholder.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
+        _placeholder.addEventListener('drop', e => {
+          if (dragOverEl && dragOverEl.dataset.personId) {
+            onDrop(e, dragOverEl, dragOverEl.dataset.personId);
+          }
+        });
       }
       return _placeholder;
     }
@@ -1610,10 +1618,6 @@
       document.querySelectorAll('.card-drag-over').forEach(c => c.classList.remove('card-drag-over'));
       _removePlaceholder();
       el.parentNode.insertBefore(_getPlaceholder(), el);
-    }
-
-    function onDragLeave(e, el) {
-      // Placeholder handles all visual feedback; nothing needed here.
     }
 
     async function onDrop(e, el, id) {
@@ -1849,11 +1853,11 @@
           html += `
               <div class="person-card"
                 id="card-${p.id}"
+                data-person-id="${p.id}"
                 draggable="${document.body.classList.contains('admin-mode')}"
                 ondragstart="onDragStart(event,this,'${p.id}')"
                 ondragend="onDragEnd(event)"
                 ondragover="onDragOver(event,this,'${p.id}')"
-                ondragleave="onDragLeave(event,this)"
                 ondrop="onDrop(event,this,'${p.id}')">
                 <div class="card-top">
                   <div>
