@@ -1271,16 +1271,16 @@
     }
 
     // ─── Task total logic ──────────────────────────────────
-    // Offboarding = 26 for all departments.
-    // GP: JMO Doctor = 21, GP/Registrar = 40.
+    // Offboarding: GP = 4, all other departments = 26.
+    // GP onboarding: JMO Doctor = 21, GP/Registrar = 41.
     // Finance & Projects & Innovation: remote = 15, non-remote = 26.
     function getTaskTotal(person) {
-      if (person.stage === 'Offboarding') return 26;
+      if (person.stage === 'Offboarding') return person.department === 'GP' ? 4 : 26;
       switch (person.department) {
         case 'Reception': return 26;
-        case 'Business':  return 30;
+        case 'Business':  return 33;
         case 'Nursing':   return 25;
-        case 'GP':        return person.jobTitle === 'JMO Doctor' ? 21 : 40;
+        case 'GP':        return person.jobTitle === 'JMO Doctor' ? 21 : 41;
         case 'Finance':
         case 'Projects & Innovation': return person.remote ? 15 : 26;
         case 'PST':       return 26;
