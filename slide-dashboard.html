@@ -265,6 +265,15 @@
     }
     .btn-ghost-delete:hover { background: rgba(201, 79, 79, 0.13); }
 
+    .btn-ghost-induction {
+      background: var(--stage-in-bg);
+      color: #8e5e8a;
+      border-color: var(--stage-in-border);
+      padding: 0.28rem 0.65rem;
+      font-size: 0.73rem;
+    }
+    .btn-ghost-induction:hover { background: rgba(196, 154, 189, 0.28); }
+
     .btn-cancel {
       background: transparent;
       color: var(--text-secondary);
@@ -1527,12 +1536,61 @@
 
     async function deletePerson(id) {
       const person = staff.find(p => p.id === id);
-      if (!confirm(`Remove ${person ? person.name : 'this person'} from the dashboard?`)) return;
+      if (!confirm(`Permanently remove ${person ? person.name : 'this person'}? This deletes their record entirely — if they're an Onboarding card whose Induction card you want to keep, use "→ Induction" instead.`)) return;
 
       const { error } = await db.from('slide_staff').delete().eq('id', id);
       if (error) { alert('Error deleting: ' + error.message); return; }
 
       staff = staff.filter(p => p.id !== id);
+      render();
+    }
+
+    // ─── Graduate an Onboarding record into an independent Induction record ─
+    // The Induction card an Onboarding person shows once their First Day arrives
+    // is just a mirror of the same record (see visualSection/autoTriggered in
+    // renderDashboard) — it is NOT a separate row. Deleting the Onboarding card
+    // deletes that same row, so the mirrored Induction card disappears too.
+    // This converts p.stage to 'Induction' on the existing record instead of
+    // creating a new one, so the Induction card keeps its name/coach/notes and
+    // survives independently of whatever happens to the Onboarding card next.
+    async function moveToInduction(id) {
+      const p = staff.find(x => x.id === id);
+      if (!p) return;
+
+      let firstDay = p.firstDay;
+      if (!firstDay) {
+        firstDay = prompt(`${p.name}'s First Day of Work is needed to start Induction. Enter it as YYYY-MM-DD:`, '');
+        if (!firstDay) return;
+      }
+
+      if (!confirm(`Move ${p.name} to Induction? They'll become an independent Induction card — removing or editing their old Onboarding card afterward will not affect it.`)) return;
+
+      const prevStage     = p.stage;
+      const prevFirstDay  = p.firstDay;
+      const prevStartDate = p.startDate;
+
+      p.stage     = 'Induction';
+      p.firstDay  = firstDay;
+      p.startDate = firstDay;
+
+      try {
+        const { error } = await db.from('slide_staff').update({
+          stage:      'Induction',
+          first_day:  firstDay,
+          start_date: firstDay,
+          saved_at:   new Date().toISOString()
+        }).eq('id', id);
+        if (error) throw new Error(error.message);
+      } catch (err) {
+        p.stage     = prevStage;
+        p.firstDay  = prevFirstDay;
+        p.startDate = prevStartDate;
+        alert('Could not move to Induction — ' + (err.message || 'please try again.'));
+        render();
+        return;
+      }
+
+      showToast(`${p.name} moved to Induction ✓`);
       render();
     }
 
@@ -1932,8 +1990,9 @@
                     ${dateLines}
                   </div>
                   <div class="card-btns">
+                    ${stage === 'Onboarding' ? `<button class="btn btn-ghost-induction admin-ctrl" onclick="moveToInduction('${p.id}')" title="Move to Induction as an independent card — safe to delete this Onboarding card afterward">&rarr; Induction</button>` : ''}
                     <button class="btn btn-ghost-edit admin-ctrl" onclick="openModal('${p.id}')">Edit</button>
-                    <button class="btn btn-ghost-delete admin-ctrl" onclick="deletePerson('${p.id}')">Delete</button>
+                    <button class="btn btn-ghost-delete admin-ctrl" onclick="deletePerson('${p.id}')" title="Permanently delete this person's record">Delete</button>
                   </div>
                 </div>
                 ${progressHtml}
