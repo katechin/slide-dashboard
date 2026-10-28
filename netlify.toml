@@ -1,0 +1,11 @@
+# Netlify deploys the dashboard pages from public/ and the API from netlify/functions.
+[build]
+  command   = "mkdir -p public && cp *.html public/"
+  publish   = "public"
+  functions = "netlify/functions"
+
+# Opening the site's root address shows the SLIDE dashboard
+[[redirects]]
+  from   = "/"
+  to     = "/slide-dashboard.html"
+  status = 200

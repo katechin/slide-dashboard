@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cubiko Doctor Performance Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --navy:      #1e3a5f;
@@ -943,11 +942,25 @@ function loadBlankReport() {
     renderMedTable(defaultMedRows());
 }
 
-// ── Supabase ───────────────────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://ioglucqixaviphpvampq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvZ2x1Y3FpeGF2aXBocHZhbXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzIxMDIsImV4cCI6MjA5MTI0ODEwMn0.Bto4yf6w2FN_is61aGfSoEHY0fouPngE5CVSC9NtFJw';
-const TABLE       = 'doctor_reports';
-const sb          = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ── API (Netlify function → Neon, see netlify/functions/reports.mjs) ──────────
+const API_URL = '/api/reports';
+
+// Returns { data, error } so callers can check error like before
+async function api(method, { query = '', body } = {}) {
+    try {
+        const res  = await fetch(API_URL + query, {
+            method,
+            cache:   'no-store',
+            headers: body ? { 'Content-Type': 'application/json' } : undefined,
+            body:    body ? JSON.stringify(body) : undefined
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) return { data: null, error: { message: (data && data.error) || 'Request failed (' + res.status + ')' } };
+        return { data, error: null };
+    } catch (err) {
+        return { data: null, error: { message: err.message } };
+    }
+}
 
 // ── Save ───────────────────────────────────────────────────────────────────────
 async function saveDoctor() {
@@ -959,7 +972,7 @@ async function saveDoctor() {
     const row = { id, doctor_name: name, data: d, saved_at: new Date().toISOString() };
 
     toast('Saving\u2026');
-    const { error } = await sb.from(TABLE).upsert(row, { onConflict: 'id' });
+    const { error } = await api('POST', { body: { action: 'save', row } });
 
     if (error) { toast('Save failed: ' + error.message); return; }
 
@@ -974,7 +987,7 @@ async function saveDoctor() {
 async function loadDoctor(id) {
     if (!id) { confirmNew(); return; }
 
-    const { data, error } = await sb.from(TABLE).select('data').eq('id', id).single();
+    const { data, error } = await api('GET', { query: '?id=' + encodeURIComponent(id) });
     if (error || !data) { toast('Could not load report.'); return; }
 
     currentId = id;
@@ -988,7 +1001,7 @@ async function deleteDoctor() {
     const name = document.getElementById('doctorName').value.trim() || 'this report';
     if (!confirm('Delete the report for ' + name + '?\nThis cannot be undone.')) return;
 
-    const { error } = await sb.from(TABLE).delete().eq('id', currentId);
+    const { error } = await api('POST', { body: { action: 'delete', id: currentId } });
     if (error) { toast('Delete failed: ' + error.message); return; }
 
     currentId = null;
@@ -1014,9 +1027,7 @@ async function refreshDropdown() {
     const sel = document.getElementById('doctorSelect');
     sel.innerHTML = '<option value="">\u2014 New Report \u2014</option>';
 
-    const { data, error } = await sb.from(TABLE)
-        .select('id, doctor_name, saved_at')
-        .order('doctor_name', { ascending: true });
+    const { data, error } = await api('GET');
 
     if (!error && data) {
         data.forEach(row => {

@@ -1156,12 +1156,21 @@
     </symbol>
   </svg>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    // ─── Supabase client ───────────────────────────────────
-    const SUPABASE_URL = 'https://ioglucqixaviphpvampq.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvZ2x1Y3FpeGF2aXBocHZhbXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzIxMDIsImV4cCI6MjA5MTI0ODEwMn0.Bto4yf6w2FN_is61aGfSoEHY0fouPngE5CVSC9NtFJw';
-    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // ─── API (Netlify function → Neon) ─────────────────────
+    // See netlify/functions/staff.mjs. Admin actions send the password
+    // entered via the Admin button; the server checks it.
+    const API_URL = '/api/staff';
+    let adminPassword = null;
+
+    async function api(action, payload = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (adminPassword) headers['x-admin-password'] = adminPassword;
+      const res  = await fetch(API_URL, { method: 'POST', headers, body: JSON.stringify({ action, ...payload }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
 
     // ─── Department → Job Title mapping ───────────────────
     const DEPT_JOB_TITLES = {
@@ -1515,8 +1524,7 @@
           staff.push(person);
         }
 
-        const { error } = await db.from('slide_staff').upsert(toRow(person));
-        if (error) throw new Error(error.message);
+        await api('save', { row: toRow(person) });
       } catch (err) {
         // Roll back local state so the dashboard stays consistent
         if (isNew && person) {
@@ -1538,8 +1546,12 @@
       const person = staff.find(p => p.id === id);
       if (!confirm(`Permanently remove ${person ? person.name : 'this person'}? This deletes their record entirely — if they're an Onboarding card whose Induction card you want to keep, use "→ Induction" instead.`)) return;
 
-      const { error } = await db.from('slide_staff').delete().eq('id', id);
-      if (error) { alert('Error deleting: ' + error.message); return; }
+      try {
+        await api('delete', { id });
+      } catch (err) {
+        alert('Error deleting: ' + err.message);
+        return;
+      }
 
       staff = staff.filter(p => p.id !== id);
       render();
@@ -1574,13 +1586,7 @@
       p.startDate = firstDay;
 
       try {
-        const { error } = await db.from('slide_staff').update({
-          stage:      'Induction',
-          first_day:  firstDay,
-          start_date: firstDay,
-          saved_at:   new Date().toISOString()
-        }).eq('id', id);
-        if (error) throw new Error(error.message);
+        await api('moveToInduction', { id, firstDay });
       } catch (err) {
         p.stage     = prevStage;
         p.firstDay  = prevFirstDay;
@@ -1615,12 +1621,8 @@
       if (barEl) barEl.style.width = pct + '%';
       if (pctEl) pctEl.textContent = pct + '%';
 
-      debounce('tasks-' + id, async () => {
-        await db.from('slide_staff').update({
-          tasks_completed: val,
-          total_tasks:     max,
-          saved_at:        new Date().toISOString()
-        }).eq('id', id);
+      debounce('tasks-' + id, () => {
+        api('tasks', { id, tasks_completed: val, total_tasks: max }).catch(() => {});
       });
     }
 
@@ -1639,11 +1641,8 @@
       const dot = document.getElementById('notes-dot-' + id);
       if (dot) dot.style.display = value.trim() ? '' : 'none';
 
-      debounce('notes-' + id, async () => {
-        await db.from('slide_staff').update({
-          notes:    value,
-          saved_at: new Date().toISOString()
-        }).eq('id', id);
+      debounce('notes-' + id, () => {
+        api('notes', { id, notes: value }).catch(() => {});
       });
     }
 
@@ -1750,14 +1749,8 @@
       }
 
       try {
-        const results = await Promise.all(items.map(p =>
-          db.from('slide_staff').update({
-            sort_order: p.sortOrder,
-            saved_at:   new Date().toISOString()
-          }).eq('id', p.id)
-        ));
-        const failed = results.some(r => r.error);
-        if (!failed) showToast('Card order saved ✓');
+        await api('reorder', { order: items.map(p => ({ id: p.id, sort_order: p.sortOrder })) });
+        showToast('Card order saved ✓');
       } catch (err) {
         // Sort order is updated in memory; DB save failed silently.
       }
@@ -2026,15 +2019,19 @@
       renderDashboard();
     }
 
-    // ─── Load from Supabase ────────────────────────────────
+    // ─── Load from Neon ────────────────────────────────────
     async function loadStaff() {
       document.getElementById('dashboard').innerHTML =
         '<div class="loading-state"><div class="loading-spinner"></div><p>Loading staff data…</p></div>';
 
-      const { data, error } = await db.from('slide_staff').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
-      if (error) {
+      let data;
+      try {
+        const res = await fetch(API_URL, { cache: 'no-store' });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      } catch (err) {
         document.getElementById('dashboard').innerHTML =
-          `<div class="empty-state"><h3>Could not load data</h3><p>${esc(error.message)}</p></div>`;
+          `<div class="empty-state"><h3>Could not load data</h3><p>${esc(err.message)}</p></div>`;
         return;
       }
       staff = (data || []).map(fromRow);
@@ -2047,18 +2044,29 @@
     });
 
     // ─── Admin unlock ──────────────────────────────────────
-    function adminUnlock() {
+    async function adminUnlock() {
       if (document.body.classList.contains('admin-mode')) {
         document.body.classList.remove('admin-mode');
+        adminPassword = null;
         render();
         return;
       }
       const pw = prompt('Admin password:');
       if (pw === null) return; // cancelled
-      if (pw === 'YGP2026SLIDE') {
+      adminPassword = pw;
+      let ok = false;
+      try {
+        ok = (await api('checkAdmin')).ok;
+      } catch (err) {
+        adminPassword = null;
+        alert('Could not check password — ' + err.message);
+        return;
+      }
+      if (ok) {
         document.body.classList.add('admin-mode');
         render();
       } else {
+        adminPassword = null;
         alert('Incorrect password.');
       }
     }
