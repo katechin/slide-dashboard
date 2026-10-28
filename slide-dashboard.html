@@ -380,6 +380,39 @@
       margin-top: 1.4rem;
     }
 
+    /* ─── Multi-coach tick boxes ─────────────────────── */
+    .coach-checks {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.45rem 1rem;
+    }
+
+    /* .form-row label / input styles are for text fields — undo them here */
+    .form-row .coach-check {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .form-row .coach-check input {
+      appearance: auto;
+      width: 15px;
+      height: 15px;
+      padding: 0;
+      margin: 0;
+      flex-shrink: 0;
+      accent-color: var(--accent);
+      box-shadow: none;
+      cursor: pointer;
+    }
+
     /* ─── Remote toggle ──────────────────────────────── */
     .toggle-row {
       display: flex;
@@ -1072,11 +1105,15 @@
           <span class="toggle-label">Yes, this person works remotely</span>
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row" id="coach-row">
         <label for="f-coach">Coach</label>
         <select id="f-coach" onchange="onCoachChange()" disabled>
           <option value="">Select department first...</option>
         </select>
+      </div>
+      <div class="form-row" id="coach-multi-row" style="display:none">
+        <label>Coaches (tick all that apply)</label>
+        <div class="coach-checks" id="f-coach-multi"></div>
       </div>
       <div class="form-row" id="coach-other-row" style="display:none">
         <label for="f-coach-other">Coach Name (specify)</label>
@@ -1198,14 +1235,18 @@
     };
 
     const DEPT_COACHES = {
-      'Reception':             ['Megan Wright', 'Shae Connors', 'Alexandra Cownie'],
+      'Reception':             ['Megan Wright + Jess Hinchy', 'Shae Connors', 'Alexandra Cownie'],
       'Business':              ['John Deery'],
       'Nursing':               ['Micah Haly'],
-      'GP':                    ['Mel Deery', 'Megan Wright + Jess Hinchy', 'Alexandra Cownie', 'Shae Connors'],
+      'GP':                    ['Mel Deery', 'Megan Wright', 'Jess Hinchy', 'Alexandra Cownie', 'Shae Connors'],
       'Finance':               ['Aiden Chang'],
       'Projects & Innovation': ['Kenneth Lobo'],
       'PST':                   ['Jess Hinchy']
     };
+
+    // Departments where several coaches can be ticked; saved as "Name + Name"
+    const MULTI_COACH_DEPTS = ['GP'];
+    const COACH_JOINER      = ' + ';
 
     // ─── State ─────────────────────────────────────────────
     let staff        = [];
@@ -1401,6 +1442,25 @@
       otherRow.style.display = 'none';
       document.getElementById('f-coach-other').value = '';
 
+      // ── Multi-coach tick boxes (replace the dropdown for MULTI_COACH_DEPTS) ──
+      const isMulti   = MULTI_COACH_DEPTS.includes(dept);
+      const multiWrap = document.getElementById('f-coach-multi');
+      document.getElementById('coach-row').style.display       = isMulti ? 'none' : '';
+      document.getElementById('coach-multi-row').style.display = isMulti ? '' : 'none';
+      multiWrap.innerHTML = '';
+      if (isMulti) {
+        [...(DEPT_COACHES[dept] || []), '__other__'].forEach(name => {
+          const lbl = document.createElement('label');
+          lbl.className = 'coach-check';
+          const box = document.createElement('input');
+          box.type  = 'checkbox';
+          box.value = name;
+          if (name === '__other__') box.onchange = onCoachChange;
+          lbl.append(box, name === '__other__' ? 'Other (please specify)' : name);
+          multiWrap.appendChild(lbl);
+        });
+      }
+
       // ── Remote toggle ──
       if (REMOTE_DEPTS.includes(dept)) {
         remRow.style.display = '';
@@ -1412,10 +1472,59 @@
 
     // ─── Coach dropdown change ─────────────────────────────
     function onCoachChange() {
-      const val      = document.getElementById('f-coach').value;
+      const dept     = document.getElementById('f-dept').value;
+      const otherBox = document.querySelector('#f-coach-multi input[value="__other__"]');
+      const isOther  = MULTI_COACH_DEPTS.includes(dept)
+                         ? !!(otherBox && otherBox.checked)
+                         : document.getElementById('f-coach').value === '__other__';
       const otherRow = document.getElementById('coach-other-row');
-      otherRow.style.display = val === '__other__' ? '' : 'none';
-      if (val !== '__other__') document.getElementById('f-coach-other').value = '';
+      otherRow.style.display = isOther ? '' : 'none';
+      if (!isOther) document.getElementById('f-coach-other').value = '';
+    }
+
+    // Coach name(s) currently chosen in the modal, as stored on the record
+    function readCoachName(dept) {
+      const otherText = document.getElementById('f-coach-other').value.trim();
+      if (MULTI_COACH_DEPTS.includes(dept)) {
+        const names = [...document.querySelectorAll('#f-coach-multi input:checked')]
+          .map(b => b.value === '__other__' ? otherText : b.value)
+          .filter(Boolean);
+        return names.join(COACH_JOINER);
+      }
+      const sel = document.getElementById('f-coach').value;
+      return sel === '__other__' ? otherText : sel;
+    }
+
+    // Put a saved coach name back into the modal (dropdown or tick boxes)
+    function restoreCoach(dept, coachName) {
+      const coaches = DEPT_COACHES[dept] || [];
+      const showOther = text => {
+        document.getElementById('f-coach-other').value = text;
+        document.getElementById('coach-other-row').style.display = '';
+      };
+      if (MULTI_COACH_DEPTS.includes(dept)) {
+        // Older records may use "/" between names
+        const parts  = (coachName || '').split(/\s*[+\/]\s*/).filter(Boolean);
+        const others = [];
+        parts.forEach(name => {
+          const box = coaches.includes(name)
+            && document.querySelector(`#f-coach-multi input[value="${CSS.escape(name)}"]`);
+          if (box) box.checked = true; else others.push(name);
+        });
+        if (others.length) {
+          document.querySelector('#f-coach-multi input[value="__other__"]').checked = true;
+          showOther(others.join(COACH_JOINER));
+        }
+        return;
+      }
+      if (coachName && coaches.includes(coachName)) {
+        document.getElementById('f-coach').value = coachName;
+      } else if (coachName) {
+        document.getElementById('f-coach').value = '__other__';
+        showOther(coachName);
+      } else {
+        document.getElementById('f-coach').value = '';
+      }
     }
 
     // ─── Modal ─────────────────────────────────────────────
@@ -1429,17 +1538,8 @@
         document.getElementById('f-dept').value      = p.department;
         onDeptChange(); // populates job title + coach dropdowns
         document.getElementById('f-title').value     = p.jobTitle;
-        // Restore coach: preset name, 'Other', or blank
-        const coaches = DEPT_COACHES[p.department] || [];
-        if (p.coachName && coaches.includes(p.coachName)) {
-          document.getElementById('f-coach').value = p.coachName;
-        } else if (p.coachName) {
-          document.getElementById('f-coach').value          = '__other__';
-          document.getElementById('f-coach-other').value    = p.coachName;
-          document.getElementById('coach-other-row').style.display = '';
-        } else {
-          document.getElementById('f-coach').value = '';
-        }
+        // Restore coach: preset name(s), 'Other', or blank
+        restoreCoach(p.department, p.coachName);
         document.getElementById('f-stage').value    = p.stage;
         document.getElementById('f-remote').checked = !!p.remote;
         onStageChange(); // sets visibility + clears irrelevant fields
@@ -1472,11 +1572,8 @@
     // ─── Save / Delete ─────────────────────────────────────
     async function savePerson() {
       const name          = document.getElementById('f-name').value.trim();
-      const coachSel      = document.getElementById('f-coach').value;
-      const coachName     = coachSel === '__other__'
-                              ? document.getElementById('f-coach-other').value.trim()
-                              : coachSel;
       const department    = document.getElementById('f-dept').value;
+      const coachName     = readCoachName(department);
       const jobTitle      = document.getElementById('f-title').value;
       const stage         = document.getElementById('f-stage').value;
       const firstDayInput = document.getElementById('f-first-day').value || '';
