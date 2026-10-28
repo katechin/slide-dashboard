@@ -1821,8 +1821,13 @@
 
     // ─── Render Summary ────────────────────────────────────
     function renderSummary() {
+      // Match the section headers: Onboarding people whose First Day has
+      // arrived also appear (and count) in the Induction section.
       const counts = { Onboarding: 0, Induction: 0, Offboarding: 0 };
-      staff.forEach(p => { if (counts[p.stage] !== undefined) counts[p.stage]++; });
+      staff.forEach(p => {
+        if (counts[p.stage] !== undefined) counts[p.stage]++;
+        if (p.stage === 'Onboarding' && inductionStarted(p)) counts.Induction++;
+      });
 
       document.getElementById('summary').innerHTML = `
         <div class="stat-card total">
