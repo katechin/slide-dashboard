@@ -208,6 +208,15 @@
     .stat-card.induction .stat-label,
     .stat-card.offboarding .stat-label { color: #3A4A58; }
 
+    .stat-note {
+      font-size: 0.68rem;
+      line-height: 1.35;
+      color: var(--danger);
+      margin-top: 0.3rem;
+    }
+
+    .stat-note a { color: inherit; font-weight: 700; }
+
     /* ─── Dashboard top bar ───────────────────────────── */
     .dash-topbar {
       display: flex;
@@ -1220,6 +1229,9 @@
       'PST':                   ['Practice Support Officer']
     };
 
+    // Microsoft Planner board with the onboarding task checklist
+    const ONBOARDING_CHECKLIST_URL = 'https://planner.cloud.microsoft/ui/web/plan/XG8PRXlWjEmHXaBV438oiggADE5l/view/board?tid=d9d0a520-4423-4c6b-aa80-01127574c968';
+
     const DEPT_ORDER  = ['Reception', 'Business', 'Nursing', 'GP', 'Finance', 'Projects & Innovation', 'PST'];
     const STAGE_ORDER = ['Onboarding', 'Induction', 'Offboarding'];
     const REMOTE_DEPTS = ['Business', 'Finance', 'Projects & Innovation', 'PST'];
@@ -1921,10 +1933,18 @@
       // Match the section headers: Onboarding people whose First Day has
       // arrived also appear (and count) in the Induction section.
       const counts = { Onboarding: 0, Induction: 0, Offboarding: 0 };
+      let startedInduction = 0;
       staff.forEach(p => {
         if (counts[p.stage] !== undefined) counts[p.stage]++;
-        if (p.stage === 'Onboarding' && inductionStarted(p)) counts.Induction++;
+        if (p.stage === 'Onboarding' && inductionStarted(p)) {
+          counts.Induction++;
+          startedInduction++;
+        }
       });
+
+      const onboardingNote = startedInduction > 0
+        ? `<div class="stat-note">${startedInduction} ${startedInduction === 1 ? 'person has' : 'people have'} started induction, please see <a href="${ONBOARDING_CHECKLIST_URL}" target="_blank" rel="noopener">checklist</a> and tick off tasks.</div>`
+        : '';
 
       document.getElementById('summary').innerHTML = `
         <div class="stat-card total">
@@ -1939,6 +1959,7 @@
           <div class="stat-body">
             <div class="stat-number">${counts.Onboarding}</div>
             <div class="stat-label">Onboarding</div>
+            ${onboardingNote}
           </div>
         </div>
         <div class="stat-card induction">
